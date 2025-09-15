@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+watchPatterns = ["**/*.py", "requirements.txt", "config.py", "bot/**", "main.py"]
 
 [deploy]
 startCommand = "python main.py"
@@ -8,11 +9,3 @@ restartPolicyType = "always"
 [nixpacks]
 providers = ["python"]
 pythonVersion = "3.11"
-
-[variables]
-# Railway will automatically set PORT environment variable
-PORT = "8080"
-
-[build.watchPatterns]
-include = ["**/*.py", "requirements.txt", ".env.example", "config.py"]
-exclude = ["__pycache__/**", "*.pyc", "logs/**", "data/**", "exports/**", "venv/**"]
