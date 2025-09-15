@@ -6,6 +6,7 @@ Main application entry point
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -101,17 +102,60 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Start bot
-    try:
-        logger.info("🤖 LinguaBot is starting...")
-        await dp.start_polling(
-            bot,
+    # Check if running on Railway or similar cloud platform
+    port = int(os.getenv("PORT", "0"))
+    if port > 0:
+        # Running on cloud platform - use webhook mode
+        from aiohttp import web
+        from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
+        webhook_host = os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_URL") or f"https://localhost:{port}"
+        webhook_path = config.WEBHOOK_PATH
+        webhook_url = f"{webhook_host}{webhook_path}"
+
+        logger.info(f"🌐 Setting up webhook mode: {webhook_url}")
+
+        # Set webhook
+        await bot.set_webhook(
+            url=webhook_url,
             allowed_updates=dp.resolve_used_update_types()
         )
-    except Exception as e:
-        logger.error(f"Bot startup error: {e}")
-    finally:
-        await bot.session.close()
+
+        # Create web app
+        app = web.Application()
+        SimpleRequestHandler(
+            dispatcher=dp,
+            bot=bot
+        ).register(app, path=webhook_path)
+
+        setup_application(app, dp, bot=bot)
+
+        # Start web server
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', port)
+        await site.start()
+
+        logger.info(f"🚀 LinguaBot webhook server started on port {port}")
+
+        # Keep the server running
+        try:
+            await asyncio.Future()  # Run forever
+        finally:
+            await runner.cleanup()
+            await bot.session.close()
+    else:
+        # Local development - use polling mode
+        try:
+            logger.info("🤖 LinguaBot is starting in polling mode...")
+            await dp.start_polling(
+                bot,
+                allowed_updates=dp.resolve_used_update_types()
+            )
+        except Exception as e:
+            logger.error(f"Bot startup error: {e}")
+        finally:
+            await bot.session.close()
 
 if __name__ == "__main__":
     try:

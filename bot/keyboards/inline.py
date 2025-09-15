@@ -247,6 +247,16 @@ def get_payment_keyboard(payment_url: str) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def get_export_keyboard() -> InlineKeyboardMarkup:
+    """Export format selection keyboard"""
+    buttons = [
+        [InlineKeyboardButton(text="📄 PDF", callback_data="export_pdf")],
+        [InlineKeyboardButton(text="📝 TXT", callback_data="export_txt")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="back_to_menu")]
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 def get_admin_keyboard() -> InlineKeyboardMarkup:
     """Admin panel keyboard"""
     buttons = [

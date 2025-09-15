@@ -232,8 +232,36 @@ async def text_translation_handler(message: Message):
     """Handle text translation"""
     user_info = await db.get_user(message.from_user.id)
 
-    # Skip if it's a keyboard button press
-    if message.text in ['🌍 Язык', '🎨 Стиль', '⚙️ Настройки', '❓ Помощь', '📚 История', '📄 Экспорт', '⭐ Премиум']:
+    # Handle keyboard button presses
+    if message.text == '🌍 Язык':
+        await language_handler(message)
+        return
+    elif message.text == '🎨 Стиль':
+        await style_handler(message)
+        return
+    elif message.text == '⚙️ Настройки':
+        await settings_handler(message)
+        return
+    elif message.text == '❓ Помощь':
+        await help_handler(message)
+        return
+    elif message.text == '📚 История':
+        await history_handler(message)
+        return
+    elif message.text == '📄 Экспорт':
+        # Handle export request
+        user_info = await db.get_user(message.from_user.id)
+        if not user_info.get('is_premium'):
+            await message.answer(get_text('premium_required', user_info.get('interface_language', 'ru')))
+            return
+        from bot.keyboards.inline import get_export_keyboard
+        await message.answer(
+            get_text('select_export_format', user_info.get('interface_language', 'ru')),
+            reply_markup=get_export_keyboard()
+        )
+        return
+    elif message.text == '⭐ Премиум':
+        await premium_handler(message)
         return
 
     # Check daily limit
