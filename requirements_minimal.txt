@@ -1,0 +1,8 @@
+# Минимальные зависимости для запуска бота
+aiogram
+python-dotenv
+aiosqlite
+openai
+langdetect
+aiofiles
+requests

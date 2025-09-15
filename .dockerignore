@@ -1,0 +1,79 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+wsl_venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Documentation (not needed in container)
+*.md
+BOTFATHER_SETUP.md
+PROJECT_SUMMARY.md
+
+# Scripts (not needed in container)
+run.bat
+run.sh
+docker-start.bat
+docker-start.sh
+
+# Docker files (not needed in container)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Data directories (mounted as volumes)
+data/
+exports/
+
+# Audio/Video files
+*.mp3
+*.wav
+*.ogg
+*.m4a
+
+# Credentials that shouldn't be in image
+credentials.json
+google_credentials.json
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node modules (if any)
+node_modules/

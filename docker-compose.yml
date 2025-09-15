@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  linguabot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linguabot
+    restart: unless-stopped
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Additional environment variables
+    environment:
+      - TZ=Europe/Moscow
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/home/linguabot/app/data/bot.db
+
+    # Volumes for persistent data
+    volumes:
+      - ./data:/home/linguabot/app/data
+      - ./logs:/home/linguabot/app/logs
+      - ./exports:/home/linguabot/app/exports
+
+    # Port mapping (only needed for webhooks)
+    ports:
+      - "8080:8080"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('data/bot.db').execute('SELECT 1')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+    # Labels for organization
+    labels:
+      - "project=linguabot"
+      - "service=telegram-bot"
+      - "version=1.0"
+
+  # Optional: PostgreSQL for production
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: linguabot_db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: linguabot
+  #     POSTGRES_USER: linguabot
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U linguabot"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # Optional: Redis for caching
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: linguabot_redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # Optional: Monitoring with Portainer
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   container_name: portainer
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9000:9000"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - portainer_data:/data
+
+# Volumes (uncomment if using optional services)
+# volumes:
+#   postgres_data:
+#     driver: local
+#   redis_data:
+#     driver: local
+#   portainer_data:
+#     driver: local
+
+# Networks (optional)
+networks:
+  default:
+    name: linguabot_network
+    driver: bridge
