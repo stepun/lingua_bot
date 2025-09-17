@@ -17,6 +17,7 @@ services:
       - TZ=Europe/Moscow
       - PYTHONUNBUFFERED=1
       - DATABASE_PATH=/home/linguabot/app/data/bot.db
+      - PORT=0
 
     # Volumes for persistent data
     volumes:

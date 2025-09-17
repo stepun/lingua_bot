@@ -175,7 +175,8 @@ async def voice_handler(message: Message):
                     text=text,
                     target_lang=target_lang,
                     style=style,
-                    enhance=user_info.get('is_premium', False)
+                    enhance=user_info.get('is_premium', False),
+                    user_id=message.from_user.id
                 )
 
                 if not translated:
@@ -311,7 +312,8 @@ async def text_translation_handler(message: Message):
                 text=message.text,
                 target_lang=target_lang,
                 style=style,
-                enhance=has_premium
+                enhance=has_premium,
+                user_id=message.from_user.id
             )
 
             if not translated:

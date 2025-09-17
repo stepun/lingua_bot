@@ -217,14 +217,14 @@ class TranslatorService:
 
     async def enhance_with_gpt(self, original_text: str, translated_text: str,
                               target_lang: str, style: str = 'informal',
-                              explain_grammar: bool = False) -> Dict[str, Any]:
+                              explain_grammar: bool = False, user_id: int = None) -> Dict[str, Any]:
         """Enhance translation using GPT for natural language and style"""
         style_prompts = {
-            'informal': 'casual and friendly, as if talking to a friend',
-            'formal': 'formal and polite, suitable for official documents',
-            'business': 'professional and business-like',
-            'travel': 'simple and clear, suitable for tourists',
-            'academic': 'academic and scholarly'
+            'informal': 'casual and friendly, using colloquial expressions, contractions, and everyday language as if talking to a close friend',
+            'formal': 'formal and polite, using proper grammar, respectful language, and avoiding contractions - suitable for official documents and business correspondence',
+            'business': 'professional and business-oriented, using corporate terminology, concise language, and industry-appropriate expressions',
+            'travel': 'simple, clear and practical for tourists - using basic vocabulary, essential phrases, and avoiding complex grammar',
+            'academic': 'scholarly and precise, using technical terminology, complex sentence structures, and formal academic language'
         }
 
         style_description = style_prompts.get(style, style_prompts['informal'])
@@ -234,8 +234,16 @@ class TranslatorService:
 CRITICAL RULES:
 1. PRESERVE the original meaning and accuracy of the basic translation
 2. DO NOT change the core message or interpretation
-3. Focus on style adaptation and providing synonyms, NOT reinterpretation
-4. Target style: {style_description}"""
+3. ADAPT the translation style significantly to match the target style
+4. Make the style differences VERY noticeable and distinctive
+5. Target style: {style_description}
+
+STYLE ADAPTATION EXAMPLES:
+- Informal: "Hey, what's up?" vs Formal: "Good day, how are you?"
+- Business: "We need to leverage our synergies" vs Travel: "We need to work together"
+- Academic: "The empirical evidence demonstrates" vs Informal: "The facts show"
+
+Apply these style differences clearly and consistently."""
 
         # Get user's interface language for explanations
         from bot.database import db
@@ -265,18 +273,14 @@ CRITICAL RULES:
         # Default to English if interface language not supported
         lang_config = explanation_languages.get(interface_lang, explanation_languages['en'])
 
-        user_prompt = f"""Original text ({await self.detect_language(original_text) or 'unknown'}): {original_text}
-Basic translation ({target_lang}): {translated_text}
+        user_prompt = f"""Original text: {original_text}
+Basic translation: {translated_text}
 
-Your task: Enhance this accurate translation while preserving its meaning exactly.
+Transform this translation to be {style_description}.
 
-{lang_config['instruction']}
-1. {lang_config['style_text']} {style_description}
-2. {lang_config['synonyms_text']}
-3. {lang_config['explanation_text']}
-4. {lang_config['reasoning_text']}
+Provide ONLY the enhanced translation that matches the {style} style. Make the style difference very clear and noticeable.
 
-IMPORTANT: Do not change the translation's meaning or add interpretations not present in the original text."""
+Do not provide explanations or alternatives - just the enhanced translation."""
 
         if explain_grammar:
             user_prompt += f"\n5. {lang_config['grammar_text']}"
@@ -294,46 +298,24 @@ IMPORTANT: Do not change the translation's meaning or add interpretations not pr
 
             content = response.choices[0].message.content
 
-            # Parse the response with improved parsing for new format
-            lines = content.split('\n')
+            # Since we asked for ONLY the enhanced translation, use the content directly
+            enhanced_translation = content.strip()
+
+            # Remove any quotes if present
+            if enhanced_translation.startswith('"') and enhanced_translation.endswith('"'):
+                enhanced_translation = enhanced_translation[1:-1]
+
+            # If the enhanced translation is empty or same as original, keep the original
+            if not enhanced_translation or enhanced_translation == translated_text:
+                enhanced_translation = translated_text
+
             result = {
-                'enhanced_translation': translated_text,
+                'enhanced_translation': enhanced_translation,
                 'alternatives': [],
-                'explanation': '',
+                'explanation': f'Style adapted to {style}',
                 'grammar': '',
                 'synonyms': []
             }
-
-            current_section = None
-            for line in lines:
-                line = line.strip()
-                if line.startswith('1.') and 'improved' in line.lower():
-                    # Extract the enhanced translation
-                    enhanced_text = line[2:].strip()
-                    # Remove any prefixes like "Improved version:"
-                    if ':' in enhanced_text:
-                        enhanced_text = enhanced_text.split(':', 1)[1].strip()
-                    result['enhanced_translation'] = enhanced_text
-                elif line.startswith('2.') and 'synonym' in line.lower():
-                    current_section = 'synonyms'
-                elif line.startswith('3.') and 'explanation' in line.lower():
-                    current_section = 'explanation'
-                elif line.startswith('4.') and ('natural' in line.lower() or 'why' in line.lower()):
-                    current_section = 'explanation'
-                elif explain_grammar and 'grammar' in line.lower():
-                    current_section = 'grammar'
-                elif line and current_section:
-                    if current_section == 'synonyms':
-                        if line.startswith('-') or line.startswith('•') or line.startswith('*'):
-                            synonym_text = line[1:].strip()
-                            result['alternatives'].append(synonym_text)
-                    elif current_section == 'alternatives':
-                        if line.startswith('-') or line.startswith('•') or line.startswith('*'):
-                            result['alternatives'].append(line[1:].strip())
-                    elif current_section == 'explanation':
-                        result['explanation'] += line + ' '
-                    elif current_section == 'grammar':
-                        result['grammar'] += line + ' '
 
             return result
 
@@ -347,7 +329,7 @@ IMPORTANT: Do not change the translation's meaning or add interpretations not pr
             }
 
     async def translate(self, text: str, target_lang: str, source_lang: str = None,
-                       style: str = 'informal', enhance: bool = True) -> Tuple[str, Dict[str, Any]]:
+                       style: str = 'informal', enhance: bool = True, user_id: int = None) -> Tuple[str, Dict[str, Any]]:
         """Main translation method with enhancement"""
         logger.info(f"Translation request: text='{text[:30]}...', target_lang={target_lang}, source_lang={source_lang}")
 
@@ -398,8 +380,8 @@ IMPORTANT: Do not change the translation's meaning or add interpretations not pr
         }
 
         if enhance and config.OPENAI_API_KEY:
-            logger.info(f"Starting GPT enhancement for text: {text[:50]}...")
-            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style)
+            logger.info(f"Starting GPT enhancement for text: {text[:50]}... with style: {style}")
+            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style, user_id=user_id)
             logger.info(f"GPT enhancement result: {enhancement.get('enhanced_translation', 'No enhancement')[:50]}...")
             if enhancement['enhanced_translation']:
                 translated = enhancement['enhanced_translation']
