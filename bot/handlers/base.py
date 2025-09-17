@@ -72,11 +72,17 @@ async def language_handler(message: Message):
     """Handle language selection command"""
     from bot.keyboards.inline import get_language_selection_keyboard
 
+    from bot.services.translator import TranslatorService
+
     user_info = await db.get_user(message.from_user.id)
     current_lang = user_info.get('target_language', 'en')
+    interface_lang = user_info.get('interface_language', 'ru')
 
-    text = get_text('select_language', user_info.get('interface_language', 'ru')).format(
-        current_lang=config.SUPPORTED_LANGUAGES.get(current_lang, current_lang)
+    async with TranslatorService() as translator:
+        current_lang_name = await translator.get_language_name(current_lang, interface_lang)
+
+    text = get_text('select_language', interface_lang).format(
+        current_lang=current_lang_name
     )
 
     await message.answer(text, reply_markup=get_language_selection_keyboard())
@@ -188,13 +194,21 @@ async def voice_handler(message: Message):
                     is_voice=True
                 )
 
+                # Get style display name
+                from config import config
+                style_names = config.TRANSLATION_STYLES_MULTILINGUAL.get(
+                    user_info.get('interface_language', 'ru'),
+                    config.TRANSLATION_STYLES_MULTILINGUAL['ru']
+                )
+                style_display = style_names.get(style, style)
+
                 # Format response
                 response_text = f"🎤 *Распознано:* {text}\n\n"
 
                 # Show both translation stages for premium users
                 if 'basic_translation' in metadata and user_info.get('is_premium', False):
                     response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n\n"
-                    response_text += f"✨ *Улучшенный перевод (GPT-4o):*\n{translated}"
+                    response_text += f"✨ *Улучшенный перевод ({style_display}):*\n{translated}"
 
                     # Add synonyms/alternatives if available
                     if metadata.get('alternatives'):
@@ -205,11 +219,16 @@ async def voice_handler(message: Message):
                     # Add explanation if available
                     if metadata.get('explanation') and metadata['explanation'].strip():
                         explanation = metadata['explanation'].strip()[:150]  # Shorter for voice
-                        response_text += f"\n💡 *Объяснение:* {explanation}"
+                        explanation_labels = {
+                            'ru': "💡 *Объяснение:*",
+                            'en': "💡 *Explanation:*"
+                        }
+                        label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
+                        response_text += f"\n{label} {explanation}"
                         if len(metadata['explanation']) > 150:
                             response_text += "..."
                 else:
-                    response_text += f"🌍 *Перевод ({config.SUPPORTED_LANGUAGES.get(target_lang, target_lang)}):*\n{translated}"
+                    response_text += f"🌍 *Перевод ({style_display}, {config.SUPPORTED_LANGUAGES.get(target_lang, target_lang)}):*\n{translated}"
 
                 # Store metadata for callback buttons
                 if user_info.get('is_premium', False):
@@ -219,7 +238,7 @@ async def voice_handler(message: Message):
                 await processing_msg.edit_text(
                     response_text,
                     parse_mode='Markdown',
-                    reply_markup=get_translation_actions_keyboard(True, user_info.get('is_premium', False))
+                    reply_markup=get_translation_actions_keyboard(True, user_info.get('is_premium', False), user_info.get('interface_language', 'ru'))
                 )
 
     except Exception as e:
@@ -279,6 +298,8 @@ async def text_translation_handler(message: Message):
             target_lang = user_info.get('target_language', 'en')
             style = user_info.get('translation_style', 'informal')
 
+            logger.info(f"Translation request: user={message.from_user.id}, target_lang={target_lang}, user_info_target={user_info.get('target_language')}")
+
             # Check if user is admin and should get premium features
             from config import config
             is_admin = message.from_user.id in config.ADMIN_IDS
@@ -333,11 +354,19 @@ async def text_translation_handler(message: Message):
             logger.info(f"Has basic_translation key: {'basic_translation' in metadata}")
             logger.info(f"Basic != Enhanced: {metadata.get('basic_translation') != translated}")
 
+            # Get style display name
+            from config import config
+            style_names = config.TRANSLATION_STYLES_MULTILINGUAL.get(
+                user_info.get('interface_language', 'ru'),
+                config.TRANSLATION_STYLES_MULTILINGUAL['ru']
+            )
+            style_display = style_names.get(style, style)
+
             # Show two-stage translation if GPT enhancement was performed (for premium users)
             if 'basic_translation' in metadata and has_premium:
                 logger.info("Showing two-stage translation (basic + enhanced) for premium user")
                 response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n\n"
-                response_text += f"✨ *Улучшенный перевод (GPT-4o):*\n{translated}"
+                response_text += f"✨ *Улучшенный перевод ({style_display}):*\n{translated}"
 
                 # Add synonyms/alternatives if available
                 if metadata.get('alternatives'):
@@ -348,12 +377,17 @@ async def text_translation_handler(message: Message):
                 # Add explanation if available
                 if metadata.get('explanation') and metadata['explanation'].strip():
                     explanation = metadata['explanation'].strip()[:200]  # Limit length
-                    response_text += f"\n💡 *Объяснение:* {explanation}"
+                    explanation_labels = {
+                        'ru': "💡 *Объяснение:*",
+                        'en': "💡 *Explanation:*"
+                    }
+                    label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
+                    response_text += f"\n{label} {explanation}"
                     if len(metadata['explanation']) > 200:
                         response_text += "..."
             else:
                 logger.info("Showing single translation (no two stages)")
-                response_text += f"📝 *Перевод:*\n{translated}"
+                response_text += f"📝 *Перевод ({style_display}):*\n{translated}"
 
             # Add remaining translations info for free users
             if not user_info.get('is_premium'):
@@ -365,7 +399,7 @@ async def text_translation_handler(message: Message):
                 for alt in metadata['alternatives'][:2]:
                     response_text += f"• {alt}\n"
 
-            keyboard = get_translation_actions_keyboard(True, user_info.get('is_premium', False))
+            keyboard = get_translation_actions_keyboard(True, user_info.get('is_premium', False), user_info.get('interface_language', 'ru'))
 
             # Store metadata for callback buttons
             if user_info.get('is_premium', False):

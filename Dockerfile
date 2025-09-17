@@ -35,14 +35,16 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash linguabot
-USER linguabot
+
+# Set working directory and create necessary directories as root
 WORKDIR /home/linguabot/app
+RUN mkdir -p data logs exports && chown -R linguabot:linguabot /home/linguabot/app
 
 # Copy application code
 COPY --chown=linguabot:linguabot . .
 
-# Create necessary directories
-RUN mkdir -p data logs exports
+# Switch to non-root user
+USER linguabot
 
 # Set environment variables
 ENV PYTHONPATH=/home/linguabot/app

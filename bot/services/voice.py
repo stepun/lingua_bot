@@ -279,19 +279,40 @@ class VoiceService:
                 tmp_file.write(audio_data)
                 tmp_path = tmp_file.name
 
-            # Convert OGG to MP3 if needed
-            audio = AudioSegment.from_ogg(tmp_path)
-            mp3_path = tmp_path.replace('.ogg', '.mp3')
-            audio.export(mp3_path, format='mp3')
+            try:
+                # Try to transcribe OGG directly with Whisper first (it supports OGG)
+                if config.OPENAI_API_KEY:
+                    text = await self.transcribe_with_whisper(tmp_path)
+                    if text:
+                        os.remove(tmp_path)
+                        return text
 
-            # Transcribe
-            text = await self.transcribe_audio(mp3_path)
+                # If Whisper fails or is not available, try to convert using pydub
+                audio = AudioSegment.from_ogg(tmp_path)
+                mp3_path = tmp_path.replace('.ogg', '.mp3')
+                audio.export(mp3_path, format='mp3')
 
-            # Clean up
-            os.remove(tmp_path)
-            os.remove(mp3_path)
+                # Transcribe converted file
+                text = await self.transcribe_audio(mp3_path)
 
-            return text
+                # Clean up
+                os.remove(tmp_path)
+                os.remove(mp3_path)
+
+                return text
+            except Exception as conversion_error:
+                logger.error(f"Audio conversion error (ffmpeg might be missing): {conversion_error}")
+
+                # If conversion fails, try transcribing OGG directly with Google (may not work)
+                try:
+                    text = await self.transcribe_with_google(tmp_path)
+                    os.remove(tmp_path)
+                    return text
+                except Exception as google_error:
+                    logger.error(f"Google STT with OGG failed: {google_error}")
+                    os.remove(tmp_path)
+                    return None
+
         except Exception as e:
             logger.error(f"Voice processing error: {e}")
             return None

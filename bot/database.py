@@ -110,13 +110,28 @@ class Database:
         premium_until = datetime.now() + timedelta(days=36500) if is_admin else None  # 100 years for admin
 
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                INSERT OR REPLACE INTO users (
-                    user_id, username, first_name, last_name, language_code,
-                    interface_language, is_premium, premium_until, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, first_name, last_name, language_code,
-                 language_code, premium_status, premium_until, datetime.now()))
+            # Check if user exists
+            cursor = await db.execute('SELECT user_id, target_language FROM users WHERE user_id = ?', (user_id,))
+            existing_user = await cursor.fetchone()
+
+            if existing_user:
+                # User exists - update without changing target_language
+                await db.execute('''
+                    UPDATE users SET
+                        username = ?, first_name = ?, last_name = ?, language_code = ?,
+                        interface_language = ?, is_premium = ?, premium_until = ?, updated_at = ?
+                    WHERE user_id = ?
+                ''', (username, first_name, last_name, language_code,
+                     language_code, premium_status, premium_until, datetime.now(), user_id))
+            else:
+                # New user - insert with default target_language = 'en'
+                await db.execute('''
+                    INSERT INTO users (
+                        user_id, username, first_name, last_name, language_code,
+                        interface_language, target_language, is_premium, premium_until, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, username, first_name, last_name, language_code,
+                     language_code, 'en', premium_status, premium_until, datetime.now()))
 
             # Initialize user settings
             await db.execute('''

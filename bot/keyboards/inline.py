@@ -222,18 +222,36 @@ def get_confirmation_keyboard(confirm_action: str) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_translation_actions_keyboard(has_voice: bool = False, is_premium: bool = False) -> InlineKeyboardMarkup:
+def get_translation_actions_keyboard(has_voice: bool = False, is_premium: bool = False, interface_lang: str = 'ru') -> InlineKeyboardMarkup:
     """Actions for translation result"""
     buttons = []
 
+    # Multilingual button texts
+    button_texts = {
+        'ru': {
+            'voice': "🔊 Озвучить",
+            'alternatives': "🔄 Альтернативы",
+            'explanation': "📝 Объяснение",
+            'grammar': "📚 Грамматика"
+        },
+        'en': {
+            'voice': "🔊 Voice",
+            'alternatives': "🔄 Alternatives",
+            'explanation': "📝 Explanation",
+            'grammar': "📚 Grammar"
+        }
+    }
+
+    texts = button_texts.get(interface_lang, button_texts['ru'])
+
     if has_voice:
-        buttons.append([InlineKeyboardButton(text="🔊 Озвучить", callback_data="voice_translation")])
+        buttons.append([InlineKeyboardButton(text=texts['voice'], callback_data="voice_translation")])
 
     if is_premium:
         buttons.extend([
-            [InlineKeyboardButton(text="🔄 Альтернативы", callback_data="show_alternatives")],
-            [InlineKeyboardButton(text="📝 Объяснение", callback_data="show_explanation")],
-            [InlineKeyboardButton(text="📚 Грамматика", callback_data="show_grammar")]
+            [InlineKeyboardButton(text=texts['alternatives'], callback_data="show_alternatives")],
+            [InlineKeyboardButton(text=texts['explanation'], callback_data="show_explanation")],
+            [InlineKeyboardButton(text=texts['grammar'], callback_data="show_grammar")]
         ])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)

@@ -90,6 +90,24 @@ class Config:
         'academic': 'Академический'
     }
 
+    # Translation Styles (multilingual)
+    TRANSLATION_STYLES_MULTILINGUAL = {
+        'ru': {
+            'informal': 'Неформальный',
+            'formal': 'Формальный',
+            'business': 'Деловой',
+            'travel': 'Для путешествий',
+            'academic': 'Академический'
+        },
+        'en': {
+            'informal': 'Informal',
+            'formal': 'Formal',
+            'business': 'Business',
+            'travel': 'Travel',
+            'academic': 'Academic'
+        }
+    }
+
     # OpenAI Model Configuration
     GPT_MODEL = "gpt-4o"
     WHISPER_MODEL = "whisper-1"

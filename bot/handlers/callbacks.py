@@ -40,11 +40,17 @@ async def back_to_menu_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "select_language")
 async def select_language_handler(callback: CallbackQuery):
     """Show language selection"""
+    from bot.services.translator import TranslatorService
+
     user_info = await db.get_user(callback.from_user.id)
     current_lang = user_info.get('target_language', 'en')
+    interface_lang = user_info.get('interface_language', 'ru')
 
-    text = get_text('select_language', user_info.get('interface_language', 'ru')).format(
-        current_lang=config.SUPPORTED_LANGUAGES.get(current_lang, current_lang)
+    async with TranslatorService() as translator:
+        current_lang_name = await translator.get_language_name(current_lang, interface_lang)
+
+    text = get_text('select_language', interface_lang).format(
+        current_lang=current_lang_name
     )
 
     await callback.message.edit_text(text, reply_markup=get_language_selection_keyboard())
@@ -75,14 +81,18 @@ async def language_selection_handler(callback: CallbackQuery):
     """Handle language selection"""
     lang_code = callback.data[5:]  # Remove "lang_" prefix
 
+    logger.info(f"Language selection: user={callback.from_user.id}, lang_code={lang_code}, callback_data={callback.data}")
+
     if lang_code not in config.SUPPORTED_LANGUAGES:
         await callback.answer("❌ Неподдерживаемый язык", show_alert=True)
         return
 
     # Update user's target language
     await db.update_user_language(callback.from_user.id, lang_code)
+    logger.info(f"Updated language for user {callback.from_user.id} to {lang_code}")
 
     user_info = await db.get_user(callback.from_user.id)
+    logger.info(f"Verification after update: user={callback.from_user.id}, target_language={user_info.get('target_language')}")
     lang_name = config.SUPPORTED_LANGUAGES[lang_code]
 
     success_text = get_text('language_changed', user_info.get('interface_language', 'ru')).format(
@@ -394,12 +404,29 @@ async def show_explanation_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
     metadata = last_translation_metadata.get(user_id, {})
 
+    # Get user's interface language
+    from bot.database import db
+    user_info = await db.get_user(user_id)
+    interface_lang = user_info.get('interface_language', 'ru') if user_info else 'ru'
+
     explanation = metadata.get('explanation', '').strip()
     if not explanation:
-        await callback.answer("❌ Объяснение недоступно", show_alert=True)
+        error_messages = {
+            'ru': "❌ Объяснение недоступно",
+            'en': "❌ Explanation not available"
+        }
+        error_msg = error_messages.get(interface_lang, error_messages['ru'])
+        await callback.answer(error_msg, show_alert=True)
         return
 
-    explanation_text = f"💡 **Объяснение перевода:**\n\n{explanation}"
+    # Multilingual headers
+    explanation_headers = {
+        'ru': "💡 **Объяснение перевода:**",
+        'en': "💡 **Translation explanation:**"
+    }
+
+    header = explanation_headers.get(interface_lang, explanation_headers['ru'])
+    explanation_text = f"{header}\n\n{explanation}"
 
     await callback.message.answer(explanation_text, parse_mode='Markdown')
     await callback.answer()
@@ -410,12 +437,29 @@ async def show_grammar_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
     metadata = last_translation_metadata.get(user_id, {})
 
+    # Get user's interface language
+    from bot.database import db
+    user_info = await db.get_user(user_id)
+    interface_lang = user_info.get('interface_language', 'ru') if user_info else 'ru'
+
     grammar = metadata.get('grammar', '').strip()
     if not grammar:
-        await callback.answer("❌ Грамматическое объяснение недоступно", show_alert=True)
+        error_messages = {
+            'ru': "❌ Грамматическое объяснение недоступно",
+            'en': "❌ Grammar explanation not available"
+        }
+        error_msg = error_messages.get(interface_lang, error_messages['ru'])
+        await callback.answer(error_msg, show_alert=True)
         return
 
-    grammar_text = f"📚 **Грамматическое объяснение:**\n\n{grammar}"
+    # Multilingual headers
+    grammar_headers = {
+        'ru': "📚 **Грамматическое объяснение:**",
+        'en': "📚 **Grammar explanation:**"
+    }
+
+    header = grammar_headers.get(interface_lang, grammar_headers['ru'])
+    grammar_text = f"{header}\n\n{grammar}"
 
     await callback.message.answer(grammar_text, parse_mode='Markdown')
     await callback.answer()
