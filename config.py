@@ -39,6 +39,11 @@ class Config:
     ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',') if id.strip().isdigit()] if ADMIN_IDS_STR else []
     ADMIN_ID = ADMIN_IDS[0] if ADMIN_IDS else 0  # Primary admin
 
+    # Debug logging for admin configuration
+    print(f"[CONFIG DEBUG] ADMIN_IDS environment variable: '{ADMIN_IDS_STR}'")
+    print(f"[CONFIG DEBUG] Parsed ADMIN_IDS list: {ADMIN_IDS}")
+    print(f"[CONFIG DEBUG] Primary ADMIN_ID: {ADMIN_ID}")
+
     # Paths
     BASE_DIR = Path(__file__).parent
     DATA_DIR = BASE_DIR / "data"

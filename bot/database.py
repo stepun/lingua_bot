@@ -105,7 +105,7 @@ class Database:
         from config import config
 
         # Check if user is admin
-        is_admin = user_id == config.ADMIN_ID
+        is_admin = user_id in config.ADMIN_IDS
         premium_status = is_admin  # Admin automatically gets premium
         premium_until = datetime.now() + timedelta(days=36500) if is_admin else None  # 100 years for admin
 
