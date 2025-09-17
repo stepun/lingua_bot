@@ -35,8 +35,8 @@ class Config:
     MAX_HISTORY_ITEMS = int(os.getenv("MAX_HISTORY_ITEMS", "100"))
 
     # Admin Settings
-    ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "1455172192")
-    ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',') if id.strip().isdigit()]
+    ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "")
+    ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',') if id.strip().isdigit()] if ADMIN_IDS_STR else []
     ADMIN_ID = ADMIN_IDS[0] if ADMIN_IDS else 0  # Primary admin
 
     # Paths
