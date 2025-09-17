@@ -281,7 +281,7 @@ async def text_translation_handler(message: Message):
 
             # Check if user is admin and should get premium features
             from config import config
-            is_admin = message.from_user.id == config.ADMIN_ID
+            is_admin = message.from_user.id in config.ADMIN_IDS
             has_premium = user_info.get('is_premium', False) or is_admin
 
             logger.info(f"Translation for user {message.from_user.id}: admin={is_admin}, premium={has_premium}")

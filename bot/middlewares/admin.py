@@ -30,7 +30,7 @@ class AdminMiddleware(BaseMiddleware):
             user_id = event.callback_query.from_user.id
 
         # Add admin status to data
-        data['is_admin'] = user_id == config.ADMIN_ID
+        data['is_admin'] = user_id in config.ADMIN_IDS
 
         if data['is_admin']:
             logger.info(f"Admin access granted for user {user_id}")
@@ -39,4 +39,4 @@ class AdminMiddleware(BaseMiddleware):
 
 def is_admin(user_id: int) -> bool:
     """Check if user is admin"""
-    return user_id == config.ADMIN_ID
+    return user_id in config.ADMIN_IDS
