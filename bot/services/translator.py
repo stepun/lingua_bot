@@ -273,7 +273,17 @@ Apply these style differences clearly and consistently."""
         # Default to English if interface language not supported
         lang_config = explanation_languages.get(interface_lang, explanation_languages['en'])
 
-        user_prompt = f"""Original text: {original_text}
+        if explain_grammar:
+            user_prompt = f"""Original text: {original_text}
+Basic translation: {translated_text}
+
+Task: Enhance the translation to {style_description} style AND provide grammar explanation.
+
+Format your response as:
+Enhanced translation: [improved translation with clear {style} style]
+Grammar explanation: [explain key grammar points, word choices, and style differences for language learners]"""
+        else:
+            user_prompt = f"""Original text: {original_text}
 Basic translation: {translated_text}
 
 Transform this translation to be {style_description}.
@@ -298,24 +308,44 @@ Do not provide explanations or alternatives - just the enhanced translation."""
 
             content = response.choices[0].message.content
 
-            # Since we asked for ONLY the enhanced translation, use the content directly
-            enhanced_translation = content.strip()
-
-            # Remove any quotes if present
-            if enhanced_translation.startswith('"') and enhanced_translation.endswith('"'):
-                enhanced_translation = enhanced_translation[1:-1]
-
-            # If the enhanced translation is empty or same as original, keep the original
-            if not enhanced_translation or enhanced_translation == translated_text:
+            # Parse response based on whether grammar explanation was requested
+            if explain_grammar:
+                lines = content.split('\n')
                 enhanced_translation = translated_text
+                grammar_explanation = ''
 
-            result = {
-                'enhanced_translation': enhanced_translation,
-                'alternatives': [],
-                'explanation': f'Style adapted to {style}',
-                'grammar': '',
-                'synonyms': []
-            }
+                for line in lines:
+                    line = line.strip()
+                    if line.lower().startswith('enhanced translation:'):
+                        enhanced_translation = line.split(':', 1)[1].strip()
+                    elif line.lower().startswith('grammar explanation:'):
+                        grammar_explanation = line.split(':', 1)[1].strip()
+                    elif line and not enhanced_translation and not line.lower().startswith(('enhanced', 'grammar', 'task:')):
+                        # Fallback: first non-header line might be the translation
+                        enhanced_translation = line
+
+                result = {
+                    'enhanced_translation': enhanced_translation,
+                    'alternatives': [],
+                    'explanation': f'Style adapted to {style}',
+                    'grammar': grammar_explanation,
+                    'synonyms': []
+                }
+            else:
+                # Original simple parsing for non-grammar requests
+                enhanced_translation = content.strip()
+                if enhanced_translation.startswith('"') and enhanced_translation.endswith('"'):
+                    enhanced_translation = enhanced_translation[1:-1]
+                if not enhanced_translation or enhanced_translation == translated_text:
+                    enhanced_translation = translated_text
+
+                result = {
+                    'enhanced_translation': enhanced_translation,
+                    'alternatives': [],
+                    'explanation': f'Style adapted to {style}',
+                    'grammar': '',
+                    'synonyms': []
+                }
 
             return result
 
@@ -329,7 +359,8 @@ Do not provide explanations or alternatives - just the enhanced translation."""
             }
 
     async def translate(self, text: str, target_lang: str, source_lang: str = None,
-                       style: str = 'informal', enhance: bool = True, user_id: int = None) -> Tuple[str, Dict[str, Any]]:
+                       style: str = 'informal', enhance: bool = True, user_id: int = None,
+                       explain_grammar: bool = False) -> Tuple[str, Dict[str, Any]]:
         """Main translation method with enhancement"""
         logger.info(f"Translation request: text='{text[:30]}...', target_lang={target_lang}, source_lang={source_lang}")
 
@@ -381,7 +412,7 @@ Do not provide explanations or alternatives - just the enhanced translation."""
 
         if enhance and config.OPENAI_API_KEY:
             logger.info(f"Starting GPT enhancement for text: {text[:50]}... with style: {style}")
-            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style, user_id=user_id)
+            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style, explain_grammar=explain_grammar, user_id=user_id)
             logger.info(f"GPT enhancement result: {enhancement.get('enhanced_translation', 'No enhancement')[:50]}...")
             if enhancement['enhanced_translation']:
                 translated = enhancement['enhanced_translation']

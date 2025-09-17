@@ -148,11 +148,15 @@ async def voice_handler(message: Message):
         await message.answer(get_text('voice_premium_required', user_info.get('interface_language', 'ru')))
         return
 
-    # Check daily limit for free users (voice counts as translation)
-    can_translate, remaining = await db.check_daily_limit(message.from_user.id)
-    if not can_translate:
-        await message.answer(get_text('daily_limit_reached', user_info.get('interface_language', 'ru')))
-        return
+    # Check daily limit for free users (voice counts as translation) - skip for admins
+    from config import config
+    is_admin = message.from_user.id in config.ADMIN_IDS
+
+    if not is_admin:
+        can_translate, remaining = await db.check_daily_limit(message.from_user.id)
+        if not can_translate:
+            await message.answer(get_text('daily_limit_reached', user_info.get('interface_language', 'ru')))
+            return
 
     # Show processing message
     processing_msg = await message.answer(get_text('processing_voice', user_info.get('interface_language', 'ru')))
@@ -171,12 +175,16 @@ async def voice_handler(message: Message):
                 target_lang = user_info.get('target_language', 'en')
                 style = user_info.get('translation_style', 'informal')
 
+                # Check if user is admin or has premium (already imported config above)
+                has_premium = user_info.get('is_premium', False) or is_admin
+
                 translated, metadata = await translator.translate(
                     text=text,
                     target_lang=target_lang,
                     style=style,
-                    enhance=user_info.get('is_premium', False),
-                    user_id=message.from_user.id
+                    enhance=has_premium,
+                    user_id=message.from_user.id,
+                    explain_grammar=has_premium
                 )
 
                 if not translated:
@@ -284,12 +292,16 @@ async def text_translation_handler(message: Message):
         await premium_handler(message)
         return
 
-    # Check daily limit
-    can_translate, remaining = await db.check_daily_limit(message.from_user.id)
-    if not can_translate:
-        limit_text = get_text('daily_limit_reached', user_info.get('interface_language', 'ru'))
-        await message.answer(limit_text)
-        return
+    # Check daily limit (skip for admins)
+    from config import config
+    is_admin = message.from_user.id in config.ADMIN_IDS
+
+    if not is_admin:
+        can_translate, remaining = await db.check_daily_limit(message.from_user.id)
+        if not can_translate:
+            limit_text = get_text('daily_limit_reached', user_info.get('interface_language', 'ru'))
+            await message.answer(limit_text)
+            return
 
     # Show typing
     await message.bot.send_chat_action(chat_id=message.chat.id, action='typing')
@@ -301,9 +313,7 @@ async def text_translation_handler(message: Message):
 
             logger.info(f"Translation request: user={message.from_user.id}, target_lang={target_lang}, user_info_target={user_info.get('target_language')}")
 
-            # Check if user is admin and should get premium features
-            from config import config
-            is_admin = message.from_user.id in config.ADMIN_IDS
+            # Check if user is admin and should get premium features (already imported above)
             has_premium = user_info.get('is_premium', False) or is_admin
 
             logger.info(f"Translation for user {message.from_user.id}: admin={is_admin}, premium={has_premium}")
@@ -313,7 +323,8 @@ async def text_translation_handler(message: Message):
                 target_lang=target_lang,
                 style=style,
                 enhance=has_premium,
-                user_id=message.from_user.id
+                user_id=message.from_user.id,
+                explain_grammar=has_premium
             )
 
             if not translated:
