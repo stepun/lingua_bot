@@ -247,10 +247,10 @@ async def voice_type_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("voice_"))
+@router.callback_query(F.data.startswith("vtype_"))
 async def voice_type_selection_handler(callback: CallbackQuery):
     """Handle voice type selection"""
-    voice_type = callback.data[6:]  # Remove "voice_" prefix
+    voice_type = callback.data[6:]  # Remove "vtype_" prefix
 
     await db.update_user_settings(callback.from_user.id, voice_type=voice_type)
 
@@ -292,6 +292,11 @@ async def history_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "clear_history")
 async def clear_history_handler(callback: CallbackQuery):
     """Show history clearing confirmation"""
+    user_info = await db.get_user(callback.from_user.id)
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Очистка истории доступна только в премиум версии", show_alert=True)
+        return
+
     await callback.message.edit_text(
         "❓ Вы уверены, что хотите очистить всю историю переводов?",
         reply_markup=get_confirmation_keyboard("clear_history")
@@ -346,7 +351,8 @@ async def voice_translation_handler(callback: CallbackQuery):
                 text=translation_text.strip(),
                 language=target_lang,
                 premium=True,
-                speed=user_info.get('voice_speed', 1.0)
+                speed=user_info.get('voice_speed', 1.0),
+                voice_type=user_info.get('voice_type', 'alloy')
             )
 
             if audio_data:

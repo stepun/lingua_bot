@@ -229,71 +229,39 @@ class TranslatorService:
 
         style_description = style_prompts.get(style, style_prompts['informal'])
 
-        system_prompt = f"""You are a professional translator and language expert specializing in accurate, contextual translation enhancement.
-
-CRITICAL RULES:
-1. PRESERVE the original meaning and accuracy of the basic translation
-2. DO NOT change the core message or interpretation
-3. ADAPT the translation style significantly to match the target style
-4. Make the style differences VERY noticeable and distinctive
-5. Target style: {style_description}
-
-STYLE ADAPTATION EXAMPLES:
-- Informal: "Hey, what's up?" vs Formal: "Good day, how are you?"
-- Business: "We need to leverage our synergies" vs Travel: "We need to work together"
-- Academic: "The empirical evidence demonstrates" vs Informal: "The facts show"
-
-Apply these style differences clearly and consistently."""
-
         # Get user's interface language for explanations
         from bot.database import db
         user_info = await db.get_user(user_id) if user_id else {}
         interface_lang = user_info.get('interface_language', 'ru')
 
-        # Language-specific explanation text
-        explanation_languages = {
-            'ru': {
-                'instruction': 'Объясните на русском языке:',
-                'style_text': 'Стилистически улучшенная версия, которая сохраняет тот же смысл, но соответствует стилю',
-                'synonyms_text': '2-3 синонимических альтернативы для ключевых слов/фраз (сохраняя тот же смысл)',
-                'explanation_text': 'Краткое объяснение выбора слов и культурных/контекстных заметок',
-                'reasoning_text': 'Почему эта улучшенная версия более естественна, оставаясь верной оригиналу',
-                'grammar_text': 'Грамматическое объяснение для изучающих язык'
-            },
-            'en': {
-                'instruction': 'Explain in English:',
-                'style_text': 'A stylistically improved version that maintains the same meaning but fits the style',
-                'synonyms_text': '2-3 synonym alternatives for key words/phrases (maintain same meaning)',
-                'explanation_text': 'Brief explanation of word choices and any cultural/contextual notes',
-                'reasoning_text': 'Why this enhanced version is more natural while staying faithful to the original',
-                'grammar_text': 'Grammar explanation for language learners'
-            }
-        }
-
-        # Default to English if interface language not supported
-        lang_config = explanation_languages.get(interface_lang, explanation_languages['en'])
-
+        # Create prompt for enhanced features
         if explain_grammar:
+            system_prompt = f"""You are a professional translator and language expert. Provide:
+1. Enhanced translation with {style_description} style
+2. 2-3 alternative translations
+3. Grammar explanation for language learners
+4. Brief explanation of style choices"""
+
             user_prompt = f"""Original text: {original_text}
 Basic translation: {translated_text}
+Target style: {style}
 
-Task: Enhance the translation to {style_description} style AND provide grammar explanation.
-
-Format your response as:
-Enhanced translation: [improved translation with clear {style} style]
-Grammar explanation: [explain key grammar points, word choices, and style differences for language learners]"""
+Format your response EXACTLY as:
+Enhanced: [enhanced translation]
+Alternative1: [first alternative]
+Alternative2: [second alternative]
+Grammar: [grammar explanation]
+Explanation: [brief style explanation]"""
         else:
-            user_prompt = f"""Original text: {original_text}
-Basic translation: {translated_text}
+            # Simple enhancement for non-premium
+            system_prompt = f"""You are a professional translator specializing in natural, contextual translations.
+Transform the translation to be {style_description}.
+Make the style difference clear and noticeable."""
 
-Transform this translation to be {style_description}.
+            user_prompt = f"""Original: {original_text}
+Current translation: {translated_text}
 
-Provide ONLY the enhanced translation that matches the {style} style. Make the style difference very clear and noticeable.
-
-Do not provide explanations or alternatives - just the enhanced translation."""
-
-        if explain_grammar:
-            user_prompt += f"\n5. {lang_config['grammar_text']}"
+Provide ONLY the enhanced translation in {style} style. No explanations."""
 
         try:
             response = await self.openai_client.chat.completions.create(
@@ -306,47 +274,61 @@ Do not provide explanations or alternatives - just the enhanced translation."""
                 max_tokens=500
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content.strip()
 
-            # Parse response based on whether grammar explanation was requested
+            # Parse response based on whether grammar was requested
             if explain_grammar:
                 lines = content.split('\n')
                 enhanced_translation = translated_text
+                alternatives = []
                 grammar_explanation = ''
+                explanation = ''
 
                 for line in lines:
                     line = line.strip()
-                    if line.lower().startswith('enhanced translation:'):
+                    if line.lower().startswith('enhanced:'):
                         enhanced_translation = line.split(':', 1)[1].strip()
-                    elif line.lower().startswith('grammar explanation:'):
+                    elif line.lower().startswith('alternative1:'):
+                        alt = line.split(':', 1)[1].strip()
+                        if alt:
+                            alternatives.append(alt)
+                    elif line.lower().startswith('alternative2:'):
+                        alt = line.split(':', 1)[1].strip()
+                        if alt:
+                            alternatives.append(alt)
+                    elif line.lower().startswith('grammar:'):
                         grammar_explanation = line.split(':', 1)[1].strip()
-                    elif line and not enhanced_translation and not line.lower().startswith(('enhanced', 'grammar', 'task:')):
-                        # Fallback: first non-header line might be the translation
-                        enhanced_translation = line
+                    elif line.lower().startswith('explanation:'):
+                        explanation = line.split(':', 1)[1].strip()
+
+                # Add a third alternative if we have space
+                if len(alternatives) < 3 and translated_text != enhanced_translation:
+                    alternatives.append(translated_text)
 
                 result = {
                     'enhanced_translation': enhanced_translation,
-                    'alternatives': [],
-                    'explanation': f'Style adapted to {style}',
+                    'alternatives': alternatives,
+                    'explanation': explanation or f'Style adapted to {style}',
                     'grammar': grammar_explanation,
                     'synonyms': []
                 }
             else:
-                # Original simple parsing for non-grammar requests
+                # Simple parsing for non-premium
                 enhanced_translation = content.strip()
                 if enhanced_translation.startswith('"') and enhanced_translation.endswith('"'):
                     enhanced_translation = enhanced_translation[1:-1]
-                if not enhanced_translation or enhanced_translation == translated_text:
+                if not enhanced_translation:
                     enhanced_translation = translated_text
 
                 result = {
                     'enhanced_translation': enhanced_translation,
                     'alternatives': [],
-                    'explanation': f'Style adapted to {style}',
+                    'explanation': '',
                     'grammar': '',
                     'synonyms': []
                 }
 
+            logger.info(f"GPT enhancement result - alternatives: {result.get('alternatives', [])}, grammar: {result.get('grammar', '')[:50]}")
             return result
 
         except Exception as e:

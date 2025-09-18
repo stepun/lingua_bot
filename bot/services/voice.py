@@ -194,7 +194,7 @@ class VoiceService:
             return None
 
     async def generate_speech_openai(self, text: str, language: str = 'en',
-                                    voice: str = 'alloy') -> Optional[bytes]:
+                                    voice: str = 'alloy', speed: float = 1.0) -> Optional[bytes]:
         """Generate speech using OpenAI TTS API"""
         if not self.openai_client:
             return None
@@ -204,6 +204,7 @@ class VoiceService:
                 model="tts-1",
                 voice=voice,  # alloy, echo, fable, onyx, nova, shimmer
                 input=text,
+                speed=speed,  # 0.25 to 4.0
                 response_format="mp3"
             )
 
@@ -215,7 +216,8 @@ class VoiceService:
             return None
 
     async def generate_speech(self, text: str, language: str = 'en',
-                            premium: bool = False, speed: float = 1.0) -> Optional[bytes]:
+                            premium: bool = False, speed: float = 1.0,
+                            voice_type: str = 'alloy') -> Optional[bytes]:
         """Generate speech using available services"""
         # For premium users, try higher quality services first
         if premium:
@@ -225,9 +227,9 @@ class VoiceService:
                 if audio:
                     return audio
 
-            # Try OpenAI TTS
+            # Try OpenAI TTS with user settings
             if config.OPENAI_API_KEY:
-                audio = await self.generate_speech_openai(text, language)
+                audio = await self.generate_speech_openai(text, language, voice=voice_type, speed=speed)
                 if audio:
                     return audio
 

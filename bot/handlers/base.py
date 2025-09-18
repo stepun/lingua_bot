@@ -375,29 +375,43 @@ async def text_translation_handler(message: Message):
             )
             style_display = style_names.get(style, style)
 
-            # Show two-stage translation if GPT enhancement was performed (for premium users)
-            if 'basic_translation' in metadata and has_premium:
-                logger.info("Showing two-stage translation (basic + enhanced) for premium user")
+            # Show translations based on user type
+            if 'basic_translation' in metadata:
+                # For all users - show both basic and styled translations
+                logger.info("Showing two-stage translation (basic + styled)")
                 response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n\n"
-                response_text += f"✨ *Улучшенный перевод ({style_display}):*\n{translated}"
+                response_text += f"✨ *Стилизованный перевод ({style_display}):*\n{translated}"
 
-                # Add synonyms/alternatives if available
-                if metadata.get('alternatives'):
-                    response_text += f"\n\n🔄 *Альтернативы:*\n"
-                    for alt in metadata['alternatives'][:2]:  # Show max 2 alternatives
-                        response_text += f"• {alt}\n"
+                # Premium features - alternatives and explanations
+                if has_premium:
+                    # Add synonyms/alternatives if available
+                    if metadata.get('alternatives'):
+                        response_text += f"\n\n🔄 *Альтернативы:*\n"
+                        for alt in metadata['alternatives'][:3]:  # Show max 3 alternatives
+                            response_text += f"• {alt}\n"
 
-                # Add explanation if available
-                if metadata.get('explanation') and metadata['explanation'].strip():
-                    explanation = metadata['explanation'].strip()[:200]  # Limit length
-                    explanation_labels = {
-                        'ru': "💡 *Объяснение:*",
-                        'en': "💡 *Explanation:*"
-                    }
-                    label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
-                    response_text += f"\n{label} {explanation}"
-                    if len(metadata['explanation']) > 200:
-                        response_text += "..."
+                    # Add explanation if available
+                    if metadata.get('explanation') and metadata['explanation'].strip():
+                        explanation = metadata['explanation'].strip()[:200]  # Limit length
+                        explanation_labels = {
+                            'ru': "💡 *Объяснение:*",
+                            'en': "💡 *Explanation:*"
+                        }
+                        label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
+                        response_text += f"\n{label} {explanation}"
+                        if len(metadata['explanation']) > 200:
+                            response_text += "..."
+
+                    # Add grammar if available
+                    if metadata.get('grammar') and metadata['grammar'].strip():
+                        grammar_labels = {
+                            'ru': "📚 *Грамматика:*",
+                            'en': "📚 *Grammar:*"
+                        }
+                        label = grammar_labels.get(user_info.get('interface_language', 'ru'), grammar_labels['ru'])
+                        response_text += f"\n\n{label} {metadata['grammar'][:200]}"
+                        if len(metadata['grammar']) > 200:
+                            response_text += "..."
             else:
                 logger.info("Showing single translation (no two stages)")
                 response_text += f"📝 *Перевод ({style_display}):*\n{translated}"
@@ -442,7 +456,8 @@ async def text_translation_handler(message: Message):
                             text=voice_text,
                             language=target_lang,
                             premium=True,
-                            speed=user_info.get('voice_speed', 1.0)
+                            speed=user_info.get('voice_speed', 1.0),
+                            voice_type=user_info.get('voice_type', 'alloy')
                         )
 
                         if audio_data:
