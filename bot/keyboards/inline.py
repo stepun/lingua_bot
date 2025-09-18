@@ -282,12 +282,16 @@ def get_voice_options_keyboard(has_alternatives: bool = False, interface_lang: s
             'exact': "🎯 Точный перевод",
             'styled': "✨ Стилизованный перевод",
             'alternatives': "🔄 Альтернативы",
+            'any_style': "🎨 Любой стиль",
+            'translate_style': "🔄 Перевести в другой стиль",
             'back': "◀️ Назад"
         },
         'en': {
             'exact': "🎯 Exact translation",
             'styled': "✨ Styled translation",
             'alternatives': "🔄 Alternatives",
+            'any_style': "🎨 Any style",
+            'translate_style': "🔄 Translate to other style",
             'back': "◀️ Back"
         }
     }
@@ -303,7 +307,47 @@ def get_voice_options_keyboard(has_alternatives: bool = False, interface_lang: s
     if has_alternatives:
         buttons.append([InlineKeyboardButton(text=texts['alternatives'], callback_data="voice_alternatives")])
 
+    # Add quick style options
+    buttons.extend([
+        [InlineKeyboardButton(text=texts['any_style'], callback_data="voice_any_style")],
+        [InlineKeyboardButton(text=texts['translate_style'], callback_data="translate_any_style")]
+    ])
+
     buttons.append([InlineKeyboardButton(text=texts['back'], callback_data="back_to_translation")])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_quick_styles_keyboard(interface_lang: str = 'ru', action_type: str = 'voice') -> InlineKeyboardMarkup:
+    """Quick style selection for translation/voice without re-entering text"""
+    # Get multilingual style names
+    from config import config
+    style_names = config.TRANSLATION_STYLES_MULTILINGUAL.get(interface_lang, config.TRANSLATION_STYLES_MULTILINGUAL['ru'])
+
+    # Action prefixes: voice_ for voice generation, translate_ for translation
+    action_prefix = f"{action_type}_style_"
+
+    buttons = []
+    styles = [
+        ('informal', '😊'),
+        ('formal', '🎩'),
+        ('business', '💼'),
+        ('travel', '✈️'),
+        ('academic', '📚')
+    ]
+
+    # Create buttons for each style
+    for style_key, emoji in styles:
+        style_display = style_names.get(style_key, style_key)
+        text = f"{emoji} {style_display}"
+        callback_data = f"{action_prefix}{style_key}"
+        buttons.append([InlineKeyboardButton(text=text, callback_data=callback_data)])
+
+    # Back button
+    back_texts = {
+        'ru': "◀️ Назад",
+        'en': "◀️ Back"
+    }
+    buttons.append([InlineKeyboardButton(text=back_texts.get(interface_lang, back_texts['ru']), callback_data="back_to_voice_menu")])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

@@ -5,7 +5,7 @@ import logging
 
 from bot.database import db
 from bot.keyboards.inline import *
-from bot.keyboards.inline import get_voice_options_keyboard
+from bot.keyboards.inline import get_voice_options_keyboard, get_quick_styles_keyboard
 from bot.keyboards.reply import get_main_reply_keyboard
 from bot.services.translator import TranslatorService
 from bot.services.voice import VoiceService
@@ -342,13 +342,13 @@ async def voice_translation_handler(callback: CallbackQuery):
     # Get interface language
     interface_lang = user_info.get('interface_language', 'ru')
 
-    # Show voice options selection
+    # Show voice options selection as a new message to keep the translation visible
     voice_text = {
         'ru': "🎧 Что озвучить?",
         'en': "🎧 What to voice?"
     }
 
-    await callback.message.edit_text(
+    await callback.message.answer(
         voice_text.get(interface_lang, voice_text['ru']),
         reply_markup=get_voice_options_keyboard(has_alternatives, interface_lang)
     )
@@ -560,5 +560,172 @@ async def back_to_translation_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         get_text('main_menu', interface_lang),
         reply_markup=get_main_menu_keyboard(is_premium)
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "voice_any_style")
+async def voice_any_style_handler(callback: CallbackQuery):
+    """Show style selection for voice generation"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        return
+
+    interface_lang = user_info.get('interface_language', 'ru')
+
+    style_text = {
+        'ru': "🎨 Выберите стиль для озвучки:",
+        'en': "🎨 Select style for voice:"
+    }
+
+    await callback.message.edit_text(
+        style_text.get(interface_lang, style_text['ru']),
+        reply_markup=get_quick_styles_keyboard(interface_lang, 'voice')
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "translate_any_style")
+async def translate_any_style_handler(callback: CallbackQuery):
+    """Show style selection for re-translation"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Перевод в разные стили доступен только в премиум версии", show_alert=True)
+        return
+
+    interface_lang = user_info.get('interface_language', 'ru')
+
+    style_text = {
+        'ru': "🔄 Выберите новый стиль перевода:",
+        'en': "🔄 Select new translation style:"
+    }
+
+    await callback.message.edit_text(
+        style_text.get(interface_lang, style_text['ru']),
+        reply_markup=get_quick_styles_keyboard(interface_lang, 'translate')
+    )
+    await callback.answer()
+
+# Helper function for style-based translation
+async def translate_with_style(callback: CallbackQuery, style: str, for_voice: bool = False):
+    """Helper function to translate text with specific style"""
+    user_info = await db.get_user(callback.from_user.id)
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+
+    # Get original text and target language from metadata
+    original_text = metadata.get('original_text', '')
+    if not original_text:
+        await callback.answer("❌ Исходный текст не найден", show_alert=True)
+        return
+
+    target_lang = user_info.get('target_language', 'en')
+    basic_translation = metadata.get('basic_translation', '')
+
+    await callback.answer(f"🔄 Переводим в стиль: {style}...")
+
+    try:
+        async with TranslatorService() as translator:
+            # Re-translate with new style
+            translated, new_metadata = await translator.translate(
+                text=original_text,
+                target_lang=target_lang,
+                style=style,
+                enhance=True,
+                user_id=user_id,
+                explain_grammar=True
+            )
+
+            if not translated:
+                await callback.answer("❌ Ошибка перевода", show_alert=True)
+                return
+
+            # Update stored metadata
+            last_translation_metadata[user_id] = new_metadata
+
+            # If for voice, generate audio immediately
+            if for_voice:
+                await generate_voice_for_text(callback, translated, f"перевод в стиле {style}")
+            else:
+                # Show new translation
+                from config import config
+                style_names = config.TRANSLATION_STYLES_MULTILINGUAL.get(
+                    user_info.get('interface_language', 'ru'),
+                    config.TRANSLATION_STYLES_MULTILINGUAL['ru']
+                )
+                style_display = style_names.get(style, style)
+
+                # Format response similar to main translation handler
+                source_lang_name = await translator.get_language_name(
+                    new_metadata.get('source_lang', 'auto'),
+                    user_info.get('interface_language', 'ru')
+                )
+                target_lang_name = await translator.get_language_name(
+                    target_lang,
+                    user_info.get('interface_language', 'ru')
+                )
+
+                response_text = f"🌍 *{source_lang_name} → {target_lang_name}*\n\n"
+                response_text += f"📝 *Точный перевод:*\n{new_metadata.get('basic_translation', '')}\n\n"
+                response_text += f"✨ *Стилизованный перевод ({style_display}):*\n{translated}"
+
+                # Add alternatives and grammar if available
+                if new_metadata.get('alternatives'):
+                    response_text += f"\n\n🔄 *Альтернативы:*\n"
+                    for alt in new_metadata['alternatives'][:3]:
+                        response_text += f"• {alt}\n"
+
+                if new_metadata.get('grammar') and new_metadata['grammar'].strip():
+                    grammar = new_metadata['grammar'].strip()
+                    if not grammar.endswith('.') and not grammar.endswith('!') and not grammar.endswith('?'):
+                        grammar += '.'
+                    response_text += f"\n\n📚 *Грамматика:* {grammar[:250]}"
+                    if len(grammar) > 250:
+                        response_text += "..."
+
+                keyboard = get_translation_actions_keyboard(is_premium=True, interface_lang=user_info.get('interface_language', 'ru'))
+
+                await callback.message.answer(
+                    response_text,
+                    parse_mode='Markdown',
+                    reply_markup=keyboard
+                )
+
+    except Exception as e:
+        logger.error(f"Style translation error: {e}")
+        await callback.answer("❌ Ошибка при переводе", show_alert=True)
+
+# Voice style handlers
+@router.callback_query(F.data.startswith("voice_style_"))
+async def voice_style_handler(callback: CallbackQuery):
+    """Generate voice with specific style"""
+    style = callback.data[12:]  # Remove "voice_style_" prefix
+    await translate_with_style(callback, style, for_voice=True)
+
+# Translation style handlers
+@router.callback_query(F.data.startswith("translate_style_"))
+async def translate_style_handler(callback: CallbackQuery):
+    """Translate with specific style"""
+    style = callback.data[16:]  # Remove "translate_style_" prefix
+    await translate_with_style(callback, style, for_voice=False)
+
+@router.callback_query(F.data == "back_to_voice_menu")
+async def back_to_voice_menu_handler(callback: CallbackQuery):
+    """Return to voice options menu"""
+    user_info = await db.get_user(callback.from_user.id)
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+    has_alternatives = bool(metadata.get('alternatives') and len(metadata.get('alternatives', [])) > 0)
+    interface_lang = user_info.get('interface_language', 'ru')
+
+    voice_text = {
+        'ru': "🎧 Что озвучить?",
+        'en': "🎧 What to voice?"
+    }
+
+    await callback.message.edit_text(
+        voice_text.get(interface_lang, voice_text['ru']),
+        reply_markup=get_voice_options_keyboard(has_alternatives, interface_lang)
     )
     await callback.answer()

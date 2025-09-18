@@ -404,7 +404,8 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
             'source_lang': source_lang,
             'target_lang': target_lang,
             'style': style,
-            'basic_translation': translated
+            'basic_translation': translated,
+            'original_text': text  # Store original text for re-translation
         }
 
         if enhance and config.OPENAI_API_KEY:
