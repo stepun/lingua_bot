@@ -109,7 +109,7 @@ async def main():
         from aiohttp import web
         from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-        webhook_host = os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_URL") or f"https://localhost:{port}"
+        webhook_host = config.WEBHOOK_HOST or os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_URL") or f"https://localhost:{port}"
         webhook_path = config.WEBHOOK_PATH
         webhook_url = f"{webhook_host}{webhook_path}"
 
@@ -123,6 +123,19 @@ async def main():
 
         # Create web app
         app = web.Application()
+
+        # Add health check endpoint
+        async def health_check(request):
+            return web.Response(text="OK", status=200)
+
+        app.router.add_get('/health', health_check)
+        app.router.add_get('/', health_check)  # Root endpoint
+
+        # Add payment webhook endpoint
+        from webhook import WebhookHandler
+        webhook_handler = WebhookHandler()
+        app.router.add_post('/webhook/yookassa', webhook_handler.handle_yookassa_webhook)
+
         SimpleRequestHandler(
             dispatcher=dp,
             bot=bot
