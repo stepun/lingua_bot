@@ -409,5 +409,23 @@ class Database:
             result = await cursor.fetchone()
             return result[0] if result else 0
 
+    async def update_user_subscription(self, user_id: int, is_premium: bool,
+                                     subscription_type: str, subscription_end: float):
+        """Update user subscription status"""
+        premium_until = datetime.fromtimestamp(subscription_end) if subscription_end else None
+
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute('''
+                    UPDATE users
+                    SET is_premium = ?, premium_until = ?, updated_at = ?
+                    WHERE user_id = ?
+                ''', (is_premium, premium_until, datetime.now(), user_id))
+                await db.commit()
+                return True
+            except Exception as e:
+                print(f"Error updating subscription: {e}")
+                return False
+
 # Create global database instance
 db = Database()

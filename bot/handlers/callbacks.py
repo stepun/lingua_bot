@@ -174,6 +174,47 @@ async def premium_features_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
+@router.callback_query(F.data.startswith("buy_"))
+async def buy_subscription_handler(callback: CallbackQuery):
+    """Handle subscription purchase"""
+    from bot.services.payment import PaymentService
+
+    user_id = callback.from_user.id
+    user_info = await db.get_user(user_id)
+
+    if user_info.get('is_premium'):
+        await callback.answer("Вы уже являетесь премиум пользователем!", show_alert=True)
+        return
+
+    subscription_type = callback.data.replace("buy_", "")
+
+    payment_service = PaymentService()
+    amount = payment_service.get_subscription_price(subscription_type)
+    description = payment_service.get_subscription_description(subscription_type)
+
+    payment_result = await payment_service.create_payment(
+        user_id=user_id,
+        subscription_type=subscription_type,
+        amount=amount,
+        description=description
+    )
+
+    if payment_result:
+        await callback.message.edit_text(
+            f"💳 Платёж создан!\n\n"
+            f"💰 Сумма: {amount}₽\n"
+            f"📋 Описание: {description}\n\n"
+            f"Нажмите кнопку ниже для оплаты:",
+            reply_markup=get_payment_keyboard(payment_result['confirmation_url'])
+        )
+    else:
+        await callback.message.edit_text(
+            "❌ Ошибка создания платежа. Попробуйте позже.",
+            reply_markup=get_main_menu_keyboard(False)
+        )
+
+    await callback.answer()
+
 @router.callback_query(F.data == "settings")
 async def settings_handler(callback: CallbackQuery):
     """Show settings menu"""
