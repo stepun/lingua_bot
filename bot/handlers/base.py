@@ -247,7 +247,7 @@ async def voice_handler(message: Message):
                 await processing_msg.edit_text(
                     response_text,
                     parse_mode='Markdown',
-                    reply_markup=get_translation_actions_keyboard(True, user_info.get('is_premium', False), user_info.get('interface_language', 'ru'))
+                    reply_markup=get_translation_actions_keyboard(is_premium=user_info.get('is_premium', False), interface_lang=user_info.get('interface_language', 'ru'))
                 )
 
     except Exception as e:
@@ -404,13 +404,18 @@ async def text_translation_handler(message: Message):
 
                     # Add grammar if available
                     if metadata.get('grammar') and metadata['grammar'].strip():
+                        grammar = metadata['grammar'].strip()
+                        # Ensure grammar explanation ends with proper punctuation
+                        if not grammar.endswith('.') and not grammar.endswith('!') and not grammar.endswith('?'):
+                            grammar += '.'
+
                         grammar_labels = {
                             'ru': "📚 *Грамматика:*",
                             'en': "📚 *Grammar:*"
                         }
                         label = grammar_labels.get(user_info.get('interface_language', 'ru'), grammar_labels['ru'])
-                        response_text += f"\n\n{label} {metadata['grammar'][:200]}"
-                        if len(metadata['grammar']) > 200:
+                        response_text += f"\n\n{label} {grammar[:250]}"
+                        if len(grammar) > 250:
                             response_text += "..."
             else:
                 logger.info("Showing single translation (no two stages)")
@@ -426,7 +431,7 @@ async def text_translation_handler(message: Message):
                 for alt in metadata['alternatives'][:2]:
                     response_text += f"• {alt}\n"
 
-            keyboard = get_translation_actions_keyboard(True, user_info.get('is_premium', False), user_info.get('interface_language', 'ru'))
+            keyboard = get_translation_actions_keyboard(is_premium=user_info.get('is_premium', False), interface_lang=user_info.get('interface_language', 'ru'))
 
             # Store metadata for callback buttons
             if user_info.get('is_premium', False):

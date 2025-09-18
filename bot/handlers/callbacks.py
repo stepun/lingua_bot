@@ -331,15 +331,31 @@ async def voice_translation_handler(callback: CallbackQuery):
         lines = message_text.split('\n')
 
         translation_text = ""
-        for line in lines:
-            if line.startswith("📝 *Перевод:*"):
-                # Get the next lines until we hit another section or end
-                start_idx = lines.index(line) + 1
-                for i in range(start_idx, len(lines)):
-                    if lines[i].startswith("📊") or lines[i].startswith("🔄"):
+
+        # Look for different translation patterns
+        patterns = ["📝 *Точный перевод:*", "✨ *Стилизованный перевод", "📝 *Перевод"]
+
+        for pattern in patterns:
+            for i, line in enumerate(lines):
+                if line.startswith(pattern):
+                    # Get the next lines until we hit another section or end
+                    for j in range(i + 1, len(lines)):
+                        if (lines[j].startswith("📊") or lines[j].startswith("🔄") or
+                            lines[j].startswith("💡") or lines[j].startswith("📚") or
+                            lines[j].startswith("📝") or lines[j].startswith("✨") or
+                            lines[j].strip() == ""):
+                            break
+                        translation_text += lines[j] + " "
+                    if translation_text.strip():
                         break
-                    translation_text += lines[i] + " "
+            if translation_text.strip():
                 break
+
+        # If no translation found, try to get from metadata
+        if not translation_text.strip():
+            user_id = callback.from_user.id
+            metadata = last_translation_metadata.get(user_id, {})
+            translation_text = metadata.get('basic_translation', '')
 
         if not translation_text.strip():
             await callback.answer("❌ Не удалось найти текст для озвучки", show_alert=True)
