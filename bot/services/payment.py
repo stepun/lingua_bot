@@ -38,7 +38,7 @@ class PaymentService:
                 },
                 "confirmation": {
                     "type": "redirect",
-                    "return_url": "https://t.me/your_bot_username"
+                    "return_url": "https://t.me/PolyglotAI44_bot"
                 },
                 "capture": True,
                 "description": description or f"Подписка {subscription_type}",
@@ -135,10 +135,10 @@ class PaymentService:
     def get_subscription_description(self, subscription_type: str) -> str:
         """Get subscription description"""
         descriptions = {
-            "monthly": "LinguaBot Premium - Месячная подписка",
-            "yearly": "LinguaBot Premium - Годовая подписка"
+            "monthly": "PolyglotAI44 Premium - Месячная подписка",
+            "yearly": "PolyglotAI44 Premium - Годовая подписка"
         }
-        return descriptions.get(subscription_type, "LinguaBot Premium")
+        return descriptions.get(subscription_type, "PolyglotAI44 Premium")
 
 # Alternative payment methods (for future implementation)
 

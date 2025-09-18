@@ -185,7 +185,7 @@ class ExportService:
 
             # Footer
             story.append(Spacer(1, 30))
-            footer_text = f"Создано с помощью LinguaBot 🤖<br/>Telegram: @LinguaBot<br/>{datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            footer_text = f"Создано с помощью PolyglotAI44 🤖<br/>Telegram: @PolyglotAI44_bot<br/>{datetime.now().strftime('%d.%m.%Y %H:%M')}"
             footer_style = ParagraphStyle(
                 'Footer',
                 parent=styles['Normal'],
@@ -288,8 +288,8 @@ class ExportService:
 
             # Footer
             content.append("=" * 50)
-            content.append("Создано с помощью LinguaBot 🤖")
-            content.append("Telegram: @LinguaBot")
+            content.append("Создано с помощью PolyglotAI44 🤖")
+            content.append("Telegram: @PolyglotAI44_bot")
             content.append(f"{datetime.now().strftime('%d.%m.%Y %H:%M')}")
 
             # Convert to bytes

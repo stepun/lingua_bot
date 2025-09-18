@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LinguaBot - AI-powered Telegram Translation Bot
+PolyglotAI44 - AI-powered Telegram Translation Bot
 Main application entry point
 """
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 async def on_startup():
     """Bot startup handler"""
-    logger.info("🚀 Starting LinguaBot...")
+    logger.info("🚀 Starting PolyglotAI44...")
 
     # Validate configuration
     try:
@@ -57,13 +57,13 @@ async def on_startup():
         logger.error(f"❌ Database initialization error: {e}")
         return False
 
-    logger.info("🎉 LinguaBot started successfully!")
+    logger.info("🎉 PolyglotAI44 started successfully!")
     return True
 
 async def on_shutdown():
     """Bot shutdown handler"""
-    logger.info("🛑 Shutting down LinguaBot...")
-    logger.info("👋 LinguaBot stopped")
+    logger.info("🛑 Shutting down PolyglotAI44...")
+    logger.info("👋 PolyglotAI44 stopped")
 
 async def main():
     """Main function"""
@@ -149,7 +149,7 @@ async def main():
         site = web.TCPSite(runner, '0.0.0.0', port)
         await site.start()
 
-        logger.info(f"🚀 LinguaBot webhook server started on port {port}")
+        logger.info(f"🚀 PolyglotAI44 webhook server started on port {port}")
 
         # Keep the server running
         try:
@@ -160,7 +160,7 @@ async def main():
     else:
         # Local development - use polling mode
         try:
-            logger.info("🤖 LinguaBot is starting in polling mode...")
+            logger.info("🤖 PolyglotAI44 is starting in polling mode...")
             await dp.start_polling(
                 bot,
                 allowed_updates=dp.resolve_used_update_types()

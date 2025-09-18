@@ -2,7 +2,7 @@
 
 MESSAGES = {
     'ru': {
-        'welcome': """🎉 *Добро пожаловать в LinguaBot!*
+        'welcome': """🎉 *Добро пожаловать в PolyglotAI44!*
 
 🌍 Я умный переводчик с поддержкой ИИ, который поможет вам:
 • Переводить тексты на 25+ языков
@@ -167,7 +167,7 @@ MESSAGES = {
     },
 
     'en': {
-        'welcome': """🎉 *Welcome to LinguaBot!*
+        'welcome': """🎉 *Welcome to PolyglotAI44!*
 
 🌍 I'm an AI-powered smart translator that will help you:
 • Translate texts into 25+ languages
