@@ -275,6 +275,38 @@ def get_translation_actions_keyboard(is_premium: bool = False, interface_lang: s
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def get_voice_options_keyboard(has_alternatives: bool = False, interface_lang: str = 'ru') -> InlineKeyboardMarkup:
+    """Voice options selection keyboard"""
+    button_texts = {
+        'ru': {
+            'exact': "🎯 Точный перевод",
+            'styled': "✨ Стилизованный перевод",
+            'alternatives': "🔄 Альтернативы",
+            'back': "◀️ Назад"
+        },
+        'en': {
+            'exact': "🎯 Exact translation",
+            'styled': "✨ Styled translation",
+            'alternatives': "🔄 Alternatives",
+            'back': "◀️ Back"
+        }
+    }
+
+    texts = button_texts.get(interface_lang, button_texts['ru'])
+
+    buttons = [
+        [InlineKeyboardButton(text=texts['exact'], callback_data="voice_exact")],
+        [InlineKeyboardButton(text=texts['styled'], callback_data="voice_styled")]
+    ]
+
+    # Add alternatives option only if they exist
+    if has_alternatives:
+        buttons.append([InlineKeyboardButton(text=texts['alternatives'], callback_data="voice_alternatives")])
+
+    buttons.append([InlineKeyboardButton(text=texts['back'], callback_data="back_to_translation")])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 def get_payment_keyboard(payment_url: str) -> InlineKeyboardMarkup:
     """Payment keyboard"""
     buttons = [

@@ -5,6 +5,7 @@ import logging
 
 from bot.database import db
 from bot.keyboards.inline import *
+from bot.keyboards.inline import get_voice_options_keyboard
 from bot.keyboards.reply import get_main_reply_keyboard
 from bot.services.translator import TranslatorService
 from bot.services.voice import VoiceService
@@ -326,71 +327,32 @@ async def confirm_clear_history_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "voice_translation")
 async def voice_translation_handler(callback: CallbackQuery):
-    """Generate voice for translation"""
+    """Show voice options selection"""
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
         await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
         return
 
-    await callback.answer("🔊 Генерирую голосовое сообщение...")
+    # Check if alternatives are available
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+    has_alternatives = bool(metadata.get('alternatives') and len(metadata.get('alternatives', [])) > 0)
 
-    try:
-        # Extract translation text from message
-        message_text = callback.message.text or callback.message.caption or ""
-        lines = message_text.split('\n')
+    # Get interface language
+    interface_lang = user_info.get('interface_language', 'ru')
 
-        translation_text = ""
+    # Show voice options selection
+    voice_text = {
+        'ru': "🎧 Что озвучить?",
+        'en': "🎧 What to voice?"
+    }
 
-        # Look for different translation patterns
-        patterns = ["📝 *Точный перевод:*", "✨ *Стилизованный перевод", "📝 *Перевод"]
-
-        for pattern in patterns:
-            for i, line in enumerate(lines):
-                if line.startswith(pattern):
-                    # Get the next lines until we hit another section or end
-                    for j in range(i + 1, len(lines)):
-                        if (lines[j].startswith("📊") or lines[j].startswith("🔄") or
-                            lines[j].startswith("💡") or lines[j].startswith("📚") or
-                            lines[j].startswith("📝") or lines[j].startswith("✨") or
-                            lines[j].strip() == ""):
-                            break
-                        translation_text += lines[j] + " "
-                    if translation_text.strip():
-                        break
-            if translation_text.strip():
-                break
-
-        # If no translation found, try to get from metadata
-        if not translation_text.strip():
-            user_id = callback.from_user.id
-            metadata = last_translation_metadata.get(user_id, {})
-            translation_text = metadata.get('basic_translation', '')
-
-        if not translation_text.strip():
-            await callback.answer("❌ Не удалось найти текст для озвучки", show_alert=True)
-            return
-
-        async with VoiceService() as voice_service:
-            target_lang = user_info.get('target_language', 'en')
-            audio_data = await voice_service.generate_speech(
-                text=translation_text.strip(),
-                language=target_lang,
-                premium=True,
-                speed=user_info.get('voice_speed', 1.0),
-                voice_type=user_info.get('voice_type', 'alloy')
-            )
-
-            if audio_data:
-                from aiogram.types import BufferedInputFile
-                audio_file = BufferedInputFile(audio_data, filename="translation.mp3")
-                await callback.message.answer_voice(audio_file)
-            else:
-                await callback.answer("❌ Не удалось создать голосовое сообщение", show_alert=True)
-
-    except Exception as e:
-        logger.error(f"Voice generation error: {e}")
-        await callback.answer("❌ Ошибка при создании голосового сообщения", show_alert=True)
+    await callback.message.edit_text(
+        voice_text.get(interface_lang, voice_text['ru']),
+        reply_markup=get_voice_options_keyboard(has_alternatives, interface_lang)
+    )
+    await callback.answer()
 
 @router.callback_query(F.data == "help")
 async def help_handler(callback: CallbackQuery):
@@ -494,4 +456,109 @@ async def show_grammar_handler(callback: CallbackQuery):
     grammar_text = f"{header}\n\n{grammar}"
 
     await callback.message.answer(grammar_text, parse_mode='Markdown')
+    await callback.answer()
+
+# Voice generation handlers
+async def generate_voice_for_text(callback: CallbackQuery, text: str, voice_type_name: str):
+    """Helper function to generate voice for given text"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not text.strip():
+        await callback.answer("❌ Текст для озвучки не найден", show_alert=True)
+        return
+
+    await callback.answer(f"🔊 Генерирую {voice_type_name}...")
+
+    try:
+        async with VoiceService() as voice_service:
+            target_lang = user_info.get('target_language', 'en')
+            audio_data = await voice_service.generate_speech(
+                text=text.strip(),
+                language=target_lang,
+                premium=True,
+                speed=user_info.get('voice_speed', 1.0),
+                voice_type=user_info.get('voice_type', 'alloy')
+            )
+
+            if audio_data:
+                from aiogram.types import BufferedInputFile
+                audio_file = BufferedInputFile(audio_data, filename=f"{voice_type_name}.mp3")
+                await callback.message.answer_voice(audio_file)
+            else:
+                await callback.answer("❌ Не удалось создать голосовое сообщение", show_alert=True)
+
+    except Exception as e:
+        logger.error(f"Voice generation error: {e}")
+        await callback.answer("❌ Ошибка при создании голосового сообщения", show_alert=True)
+
+@router.callback_query(F.data == "voice_exact")
+async def voice_exact_handler(callback: CallbackQuery):
+    """Generate voice for exact translation"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        return
+
+    # Get exact translation from metadata
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+    exact_text = metadata.get('basic_translation', '')
+
+    await generate_voice_for_text(callback, exact_text, "точный перевод")
+
+@router.callback_query(F.data == "voice_styled")
+async def voice_styled_handler(callback: CallbackQuery):
+    """Generate voice for styled translation"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        return
+
+    # Get styled translation from metadata - need to extract from message or use stored data
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+
+    # Try to get enhanced translation, fallback to basic if not available
+    styled_text = metadata.get('enhanced_translation', metadata.get('basic_translation', ''))
+
+    await generate_voice_for_text(callback, styled_text, "стилизованный перевод")
+
+@router.callback_query(F.data == "voice_alternatives")
+async def voice_alternatives_handler(callback: CallbackQuery):
+    """Generate voice for alternatives - let user pick which one"""
+    user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        return
+
+    # Get alternatives from metadata
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+    alternatives = metadata.get('alternatives', [])
+
+    if not alternatives:
+        await callback.answer("❌ Альтернативы недоступны", show_alert=True)
+        return
+
+    # For now, voice the first alternative
+    # TODO: Could be enhanced to let user pick which alternative
+    first_alternative = alternatives[0]
+    await generate_voice_for_text(callback, first_alternative, "альтернативный перевод")
+
+@router.callback_query(F.data == "back_to_translation")
+async def back_to_translation_handler(callback: CallbackQuery):
+    """Return to translation actions"""
+    user_info = await db.get_user(callback.from_user.id)
+    interface_lang = user_info.get('interface_language', 'ru')
+    is_premium = user_info.get('is_premium', False)
+
+    # Get original translation message (need to reconstruct or store)
+    # For now, just go back to menu
+    await callback.message.edit_text(
+        get_text('main_menu', interface_lang),
+        reply_markup=get_main_menu_keyboard(is_premium)
+    )
     await callback.answer()
