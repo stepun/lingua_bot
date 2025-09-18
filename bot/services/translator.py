@@ -234,34 +234,48 @@ class TranslatorService:
         user_info = await db.get_user(user_id) if user_id else {}
         interface_lang = user_info.get('interface_language', 'ru')
 
+        # Get target language name for prompts
+        lang_names = {
+            'ru': 'Russian', 'en': 'English', 'es': 'Spanish', 'fr': 'French',
+            'de': 'German', 'it': 'Italian', 'pt': 'Portuguese', 'ja': 'Japanese',
+            'zh': 'Chinese', 'ko': 'Korean', 'ar': 'Arabic', 'hi': 'Hindi',
+            'tr': 'Turkish', 'pl': 'Polish', 'nl': 'Dutch', 'sv': 'Swedish'
+        }
+        target_lang_name = lang_names.get(target_lang, target_lang)
+
         # Create prompt for enhanced features
         if explain_grammar:
-            system_prompt = f"""You are a professional translator and language expert. Provide:
-1. Enhanced translation with {style_description} style
-2. 2-3 alternative translations
-3. Grammar explanation for language learners
-4. Brief explanation of style choices"""
+            system_prompt = f"""You are a professional translator and language expert.
+IMPORTANT: ALL translations and alternatives MUST be in {target_lang_name} language.
+Provide:
+1. Enhanced translation in {target_lang_name} with {style_description} style
+2. 2-3 alternative translations in {target_lang_name}
+3. Grammar explanation in {interface_lang if interface_lang == 'ru' else 'English'}
+4. Brief explanation of style choices in {interface_lang if interface_lang == 'ru' else 'English'}"""
 
             user_prompt = f"""Original text: {original_text}
-Basic translation: {translated_text}
+Basic translation in {target_lang_name}: {translated_text}
 Target style: {style}
+Target language: {target_lang_name}
 
 Format your response EXACTLY as:
-Enhanced: [enhanced translation]
-Alternative1: [first alternative]
-Alternative2: [second alternative]
+Enhanced: [enhanced translation in {target_lang_name}]
+Alternative1: [first alternative in {target_lang_name}]
+Alternative2: [second alternative in {target_lang_name}]
 Grammar: [grammar explanation]
 Explanation: [brief style explanation]"""
         else:
             # Simple enhancement for non-premium
             system_prompt = f"""You are a professional translator specializing in natural, contextual translations.
+IMPORTANT: Your response MUST be in {target_lang_name} language.
 Transform the translation to be {style_description}.
 Make the style difference clear and noticeable."""
 
             user_prompt = f"""Original: {original_text}
-Current translation: {translated_text}
+Current translation in {target_lang_name}: {translated_text}
+Target language: {target_lang_name}
 
-Provide ONLY the enhanced translation in {style} style. No explanations."""
+Provide ONLY the enhanced translation in {target_lang_name} with {style} style. No explanations."""
 
         try:
             response = await self.openai_client.chat.completions.create(
