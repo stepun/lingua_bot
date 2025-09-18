@@ -247,11 +247,12 @@ class TranslatorService:
         if explain_grammar:
             system_prompt = f"""You are a professional translator and language expert.
 IMPORTANT: ALL translations and alternatives MUST be in {target_lang_name} language.
+IMPORTANT: Grammar explanations and style explanations MUST be in Russian language.
 Provide:
 1. Enhanced translation in {target_lang_name} with {style_description} style
 2. 2-3 alternative translations in {target_lang_name}
-3. Grammar explanation in {interface_lang if interface_lang == 'ru' else 'English'}
-4. Brief explanation of style choices in {interface_lang if interface_lang == 'ru' else 'English'}"""
+3. Grammar explanation in Russian language
+4. Brief explanation of style choices in Russian language"""
 
             user_prompt = f"""Original text: {original_text}
 Basic translation in {target_lang_name}: {translated_text}
@@ -262,8 +263,8 @@ Format your response EXACTLY as:
 Enhanced: [enhanced translation in {target_lang_name}]
 Alternative1: [first alternative in {target_lang_name}]
 Alternative2: [second alternative in {target_lang_name}]
-Grammar: [grammar explanation]
-Explanation: [brief style explanation]"""
+Grammar: [grammar explanation in Russian]
+Explanation: [brief style explanation in Russian]"""
         else:
             # Simple enhancement for non-premium
             system_prompt = f"""You are a professional translator specializing in natural, contextual translations.
