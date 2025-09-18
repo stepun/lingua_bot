@@ -126,16 +126,29 @@ def get_settings_keyboard(user_settings: dict) -> InlineKeyboardMarkup:
     auto_voice = "🔊 Вкл" if user_settings.get('auto_voice', False) else "🔇 Выкл"
     save_history = "✅ Вкл" if user_settings.get('save_history', True) else "❌ Выкл"
     notifications = "🔔 Вкл" if user_settings.get('notifications_enabled', True) else "🔕 Выкл"
+    is_premium = user_settings.get('is_premium', False)
 
-    buttons = [
-        [InlineKeyboardButton(text=f"Автопроигрывание: {auto_voice}", callback_data="toggle_auto_voice")],
-        [InlineKeyboardButton(text=f"Сохранение истории: {save_history}", callback_data="toggle_save_history")],
-        [InlineKeyboardButton(text=f"Уведомления: {notifications}", callback_data="toggle_notifications_enabled")],
-        [InlineKeyboardButton(text="🎚️ Скорость речи", callback_data="voice_speed")],
-        [InlineKeyboardButton(text="🗣️ Тип голоса", callback_data="voice_type")],
-        [InlineKeyboardButton(text="🗑️ Очистить историю", callback_data="clear_history")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")]
-    ]
+    buttons = []
+
+    # Premium features
+    if is_premium:
+        buttons.extend([
+            [InlineKeyboardButton(text=f"🔊 Автопроигрывание: {auto_voice}", callback_data="toggle_auto_voice")],
+            [InlineKeyboardButton(text="🎚️ Скорость речи", callback_data="voice_speed")],
+            [InlineKeyboardButton(text="🗣️ Тип голоса", callback_data="voice_type")]
+        ])
+
+    # General settings for all users
+    buttons.extend([
+        [InlineKeyboardButton(text=f"💾 Сохранение истории: {save_history}", callback_data="toggle_save_history")],
+        [InlineKeyboardButton(text=f"📢 Уведомления: {notifications}", callback_data="toggle_notifications_enabled")]
+    ])
+
+    # Premium-only features
+    if is_premium:
+        buttons.append([InlineKeyboardButton(text="🗑️ Очистить историю", callback_data="clear_history")])
+
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

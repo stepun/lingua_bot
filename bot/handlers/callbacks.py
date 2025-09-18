@@ -214,6 +214,11 @@ async def toggle_setting_handler(callback: CallbackQuery):
 async def voice_speed_handler(callback: CallbackQuery):
     """Show voice speed selection"""
     user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Настройки озвучки доступны только в премиум версии", show_alert=True)
+        return
+
     current_speed = user_info.get('voice_speed', 1.0)
 
     await callback.message.edit_text(
@@ -239,6 +244,11 @@ async def speed_selection_handler(callback: CallbackQuery):
 async def voice_type_handler(callback: CallbackQuery):
     """Show voice type selection"""
     user_info = await db.get_user(callback.from_user.id)
+
+    if not user_info.get('is_premium'):
+        await callback.answer("❌ Настройки озвучки доступны только в премиум версии", show_alert=True)
+        return
+
     current_type = user_info.get('voice_type', 'alloy')
 
     await callback.message.edit_text(
