@@ -35,8 +35,8 @@ pkill -f "python3.*main"
 # Небольшая пауза после остановки
 sleep 2
 
-# Запускаем рабочую версию бота в фоне
-nohup python3 main_fixed_middleware.py > logs/bot.log 2>&1 &
+# Запускаем рабочую версию бота в фоне (без middleware для стабильности)
+nohup python3 main_no_middleware.py > logs/bot.log 2>&1 &
 
 # Получаем PID процесса
 BOT_PID=$!
