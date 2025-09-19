@@ -17,8 +17,16 @@ if [ -f "bot.pid" ]; then
     fi
 else
     # Если файла PID нет, ищем по имени процесса
-    pkill -f "python main.py"
+    pkill -f "python.*main"
+    pkill -f "python3.*main"
     echo "Процессы бота остановлены"
 fi
 
-echo "Бот полностью остановлен"
+# Дополнительная проверка и остановка всех процессов
+pkill -f "main_fixed_middleware.py"
+pkill -f "main_no_middleware.py"
+pkill -f "main_debug.py"
+pkill -f "test_main_bot.py"
+pkill -f "test_polling.py"
+
+echo "✅ Бот полностью остановлен"

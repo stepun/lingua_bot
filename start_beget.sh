@@ -29,15 +29,20 @@ if [ ! -f ".env" ]; then
 fi
 
 # Убиваем предыдущий процесс если он запущен
-pkill -f "python main.py"
+pkill -f "python.*main"
+pkill -f "python3.*main"
 
-# Запускаем бота в фоне
-nohup python main.py > logs/bot.log 2>&1 &
+# Небольшая пауза после остановки
+sleep 2
+
+# Запускаем рабочую версию бота в фоне
+nohup python3 main_fixed_middleware.py > logs/bot.log 2>&1 &
 
 # Получаем PID процесса
 BOT_PID=$!
 echo "Бот запущен с PID: $BOT_PID"
 echo $BOT_PID > bot.pid
 
-echo "Логи можно посмотреть командой: tail -f logs/bot.log"
-echo "Для остановки используйте: pkill -f 'python main.py'"
+echo "✅ Бот PolyglotAI44 запущен успешно!"
+echo "📋 Логи: tail -f logs/bot.log"
+echo "🛑 Остановка: ./stop_beget.sh"
