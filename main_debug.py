@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 
 from bot.handlers import base, callbacks, admin, payments, export
 from bot.database import db
-from bot.middlewares.throttle import ThrottleMiddleware
-from bot.middlewares.user import UserMiddleware
+from bot.middlewares.throttling import ThrottlingMiddleware
+from bot.middlewares.user_middleware import UserMiddleware
 from config import config
 
 # Load environment variables
@@ -44,7 +44,7 @@ async def main():
     logger.info("✅ Database initialized")
 
     # Register middlewares
-    dp.message.middleware(ThrottleMiddleware())
+    dp.message.middleware(ThrottlingMiddleware())
     dp.message.middleware(UserMiddleware())
     dp.callback_query.middleware(UserMiddleware())
     logger.info("✅ Middlewares registered")
