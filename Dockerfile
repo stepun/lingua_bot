@@ -34,20 +34,20 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Create non-root user for security
-RUN useradd --create-home --shell /bin/bash linguabot
+RUN useradd --create-home --shell /bin/bash polyglotai44
 
 # Set working directory and create necessary directories as root
-WORKDIR /home/linguabot/app
-RUN mkdir -p data logs exports && chown -R linguabot:linguabot /home/linguabot/app
+WORKDIR /home/polyglotai44/app
+RUN mkdir -p data logs exports && chown -R polyglotai44:polyglotai44 /home/polyglotai44/app
 
 # Copy application code
-COPY --chown=linguabot:linguabot . .
+COPY --chown=polyglotai44:polyglotai44 . .
 
 # Switch to non-root user
-USER linguabot
+USER polyglotai44
 
 # Set environment variables
-ENV PYTHONPATH=/home/linguabot/app
+ENV PYTHONPATH=/home/polyglotai44/app
 ENV PYTHONUNBUFFERED=1
 
 # Health check

@@ -258,7 +258,12 @@ async def voice_speed_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Настройки озвучки доступны только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     current_speed = user_info.get('voice_speed', 1.0)
@@ -288,7 +293,12 @@ async def voice_type_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Настройки озвучки доступны только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     current_type = user_info.get('voice_type', 'alloy')
@@ -318,7 +328,12 @@ async def history_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Доступно только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     history = await db.get_user_history(callback.from_user.id, limit=10)
@@ -346,7 +361,12 @@ async def clear_history_handler(callback: CallbackQuery):
     """Show history clearing confirmation"""
     user_info = await db.get_user(callback.from_user.id)
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Очистка истории доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     await callback.message.edit_text(
@@ -372,7 +392,12 @@ async def voice_translation_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     # Check if alternatives are available
@@ -538,7 +563,12 @@ async def voice_exact_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     # Get exact translation from metadata
@@ -554,7 +584,12 @@ async def voice_styled_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     # Get styled translation from metadata - need to extract from message or use stored data
@@ -572,7 +607,12 @@ async def voice_alternatives_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     # Get alternatives from metadata
@@ -610,7 +650,12 @@ async def voice_any_style_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Озвучка доступна только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     interface_lang = user_info.get('interface_language', 'ru')
@@ -632,7 +677,12 @@ async def translate_any_style_handler(callback: CallbackQuery):
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
-        await callback.answer("❌ Перевод в разные стили доступен только в премиум версии", show_alert=True)
+        await callback.message.edit_text(
+            get_text('premium_required', user_info.get('interface_language', 'ru')),
+            reply_markup=get_premium_keyboard(),
+            parse_mode='Markdown'
+        )
+        await callback.answer()
         return
 
     interface_lang = user_info.get('interface_language', 'ru')
