@@ -8,6 +8,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from aiogram import Bot, Dispatcher
+from aiogram.types import Message
+from aiogram.filters import Command
 from dotenv import load_dotenv
 
 # Import handlers
@@ -42,11 +44,11 @@ async def main():
     # Регистрация handlers
     print("Регистрируем base.router...")
     dp.include_router(base.router)
-    print(f"✅ base.router зарегистрирован. Handlers: {len(base.router._handlers)}")
+    print("✅ base.router зарегистрирован")
 
     print("Регистрируем callbacks.router...")
     dp.include_router(callbacks.router)
-    print(f"✅ callbacks.router зарегистрирован. Handlers: {len(callbacks.router._handlers)}")
+    print("✅ callbacks.router зарегистрирован")
 
     # Инициализация базы данных
     print("\n=== БАЗА ДАННЫХ ===")
@@ -59,14 +61,27 @@ async def main():
     print(f"✅ Бот: @{me.username} (ID: {me.id})")
 
     # Добавим простой handler для теста
+    @dp.message(Command("test"))
+    async def test_command(message: Message):
+        print(f"📨 Получено /test от {message.from_user.username}")
+        await message.answer("✅ Диагностический handler работает!")
+
+    @dp.message(Command("start"))
+    async def test_start(message: Message):
+        print(f"📨 Получено /start от {message.from_user.username}")
+        await message.answer("✅ Start handler в диагностике работает!")
+
     @dp.message()
-    async def test_handler(message):
+    async def test_any_message(message: Message):
         print(f"📨 Получено сообщение: {message.text}")
-        await message.answer("Диагностический handler работает!")
+        await message.answer(f"Эхо: {message.text}")
 
     print("\n=== ЗАПУСК POLLING ===")
-    print("Бот запущен! Отправьте /start или любое сообщение...")
-    print("Для остановки нажмите Ctrl+C")
+    print("Бот запущен! Попробуйте команды:")
+    print("  /start - тест start handler")
+    print("  /test - тест диагностического handler")
+    print("  любой текст - эхо ответ")
+    print("\nДля остановки нажмите Ctrl+C")
 
     try:
         await dp.start_polling(bot)
