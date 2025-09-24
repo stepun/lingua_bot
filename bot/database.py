@@ -106,25 +106,67 @@ class Database:
 
         # Check if user is admin
         is_admin = user_id in config.ADMIN_IDS
-        premium_status = is_admin  # Admin automatically gets premium
-        premium_until = datetime.now() + timedelta(days=36500) if is_admin else None  # 100 years for admin
 
         async with aiosqlite.connect(self.db_path) as db:
             # Check if user exists
-            cursor = await db.execute('SELECT user_id, target_language FROM users WHERE user_id = ?', (user_id,))
+            cursor = await db.execute('SELECT user_id, target_language, is_premium, premium_until FROM users WHERE user_id = ?', (user_id,))
             existing_user = await cursor.fetchone()
 
             if existing_user:
-                # User exists - update without changing target_language
-                await db.execute('''
-                    UPDATE users SET
-                        username = ?, first_name = ?, last_name = ?, language_code = ?,
-                        interface_language = ?, is_premium = ?, premium_until = ?, updated_at = ?
-                    WHERE user_id = ?
-                ''', (username, first_name, last_name, language_code,
-                     language_code, premium_status, premium_until, datetime.now(), user_id))
+                # User exists - update and check subscription expiry
+                if is_admin:
+                    # Admin - always premium
+                    premium_status = True
+                    premium_until = datetime.now() + timedelta(days=36500)  # 100 years for admin
+                    await db.execute('''
+                        UPDATE users SET
+                            username = ?, first_name = ?, last_name = ?, language_code = ?,
+                            interface_language = ?, is_premium = ?, premium_until = ?, updated_at = ?
+                        WHERE user_id = ?
+                    ''', (username, first_name, last_name, language_code,
+                         language_code, premium_status, premium_until, datetime.now(), user_id))
+                else:
+                    # Regular user - check if subscription expired
+                    current_premium_until = existing_user[3]  # premium_until from SELECT
+
+                    # Check if subscription is expired
+                    now = datetime.now()
+                    subscription_expired = False
+                    if current_premium_until:
+                        try:
+                            # Parse premium_until (can be string or datetime)
+                            if isinstance(current_premium_until, str):
+                                premium_until_dt = datetime.fromisoformat(current_premium_until.replace('Z', '+00:00'))
+                            else:
+                                premium_until_dt = current_premium_until
+
+                            subscription_expired = premium_until_dt <= now
+                        except:
+                            subscription_expired = True
+
+                    if subscription_expired:
+                        # Reset to non-premium
+                        await db.execute('''
+                            UPDATE users SET
+                                username = ?, first_name = ?, last_name = ?, language_code = ?,
+                                interface_language = ?, is_premium = 0, premium_until = NULL, updated_at = ?
+                            WHERE user_id = ?
+                        ''', (username, first_name, last_name, language_code,
+                             language_code, datetime.now(), user_id))
+                    else:
+                        # Don't change premium status if not expired
+                        await db.execute('''
+                            UPDATE users SET
+                                username = ?, first_name = ?, last_name = ?, language_code = ?,
+                                interface_language = ?, updated_at = ?
+                            WHERE user_id = ?
+                        ''', (username, first_name, last_name, language_code,
+                             language_code, datetime.now(), user_id))
             else:
-                # New user - insert with default target_language = 'en'
+                # New user - insert with default values
+                premium_status = is_admin
+                premium_until = datetime.now() + timedelta(days=36500) if is_admin else None
+
                 await db.execute('''
                     INSERT INTO users (
                         user_id, username, first_name, last_name, language_code,

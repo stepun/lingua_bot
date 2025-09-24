@@ -9,7 +9,7 @@ from bot.keyboards.inline import get_main_menu_keyboard, get_translation_actions
 from bot.keyboards.reply import get_main_reply_keyboard
 from bot.services.translator import TranslatorService
 from bot.services.voice import VoiceService
-from bot.utils.messages import get_text
+from bot.utils.messages import get_text, get_welcome_text
 from bot.utils.rate_limit import rate_limit
 from config import config
 
@@ -34,8 +34,13 @@ async def start_handler(message: Message, state: FSMContext):
     # Get user info
     user_info = await db.get_user(user.id)
     is_premium = user_info.get('is_premium', False)
+    premium_until = user_info.get('premium_until')
 
-    welcome_text = get_text('welcome', user_info.get('interface_language', 'ru'))
+    welcome_text = get_welcome_text(
+        language=user_info.get('interface_language', 'ru'),
+        is_premium=is_premium,
+        premium_until=premium_until
+    )
 
     await message.answer(
         welcome_text,

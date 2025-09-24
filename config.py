@@ -23,6 +23,10 @@ class Config:
     YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY")
     PAYMENT_WEBHOOK_SECRET = os.getenv("PAYMENT_WEBHOOK_SECRET")
 
+    # Telegram Payments
+    PROVIDER_TOKEN = os.getenv("PROVIDER_TOKEN")
+    PAYMENT_TEST = os.getenv("PAYMENT_TEST", "false").lower() == "true"
+
     # Database
     DATABASE_PATH = os.getenv("DATABASE_PATH", "data/bot.db")
 

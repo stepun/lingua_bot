@@ -4,6 +4,8 @@ MESSAGES = {
     'ru': {
         'welcome': """🎉 *Добро пожаловать в PolyglotAI44!*
 
+{premium_status}
+
 🌍 Я умный переводчик с поддержкой ИИ, который поможет вам:
 • Переводить тексты на 25+ языков
 • Улучшать переводы с помощью GPT
@@ -240,3 +242,24 @@ Bank cards, SBP, e-wallets"""
 def get_text(key: str, language: str = 'ru') -> str:
     """Get localized text"""
     return MESSAGES.get(language, MESSAGES['ru']).get(key, f"Missing text: {key}")
+
+def get_welcome_text(language: str = 'ru', is_premium: bool = False, premium_until: str = None) -> str:
+    """Get welcome text with premium status"""
+    welcome_template = get_text('welcome', language)
+
+    if is_premium and premium_until:
+        from datetime import datetime
+        try:
+            # Parse premium_until date
+            if isinstance(premium_until, str):
+                premium_until_dt = datetime.fromisoformat(premium_until.replace('Z', '+00:00'))
+            else:
+                premium_until_dt = premium_until
+
+            premium_status = f"✅ *Премиум статус: АКТИВЕН*\n📅 Действует до: {premium_until_dt.strftime('%d.%m.%Y')}"
+        except:
+            premium_status = "✅ *Премиум статус: АКТИВЕН*"
+    else:
+        premium_status = "🆓 *Статус: Базовый пользователь*"
+
+    return welcome_template.format(premium_status=premium_status)
