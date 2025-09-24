@@ -342,7 +342,9 @@ class Database:
         """Activate user's premium subscription"""
         async with aiosqlite.connect(self.db_path) as db:
             now = datetime.now()
-            if subscription_type == 'monthly':
+            if subscription_type == 'daily':
+                expires_at = now + timedelta(days=1)
+            elif subscription_type == 'monthly':
                 expires_at = now + timedelta(days=30)
             else:  # yearly
                 expires_at = now + timedelta(days=365)

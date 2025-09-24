@@ -103,6 +103,7 @@ def get_style_selection_keyboard() -> InlineKeyboardMarkup:
 def get_premium_keyboard() -> InlineKeyboardMarkup:
     """Premium subscription keyboard"""
     buttons = [
+        [InlineKeyboardButton(text="⚡ Премиум на 1 день — 20₽", callback_data="buy_telegram_daily")],
         [InlineKeyboardButton(text="💳 Месячная подписка — 490₽", callback_data="buy_telegram_monthly")],
         [InlineKeyboardButton(text="💎 Годовая подписка — 4680₽ (-20%)", callback_data="buy_telegram_yearly")],
         [InlineKeyboardButton(text="🎁 Экономьте 1200₽ с годовой подпиской!", callback_data="noop")],
@@ -115,6 +116,7 @@ def get_premium_keyboard() -> InlineKeyboardMarkup:
 def get_premium_features_keyboard() -> InlineKeyboardMarkup:
     """Premium features info keyboard"""
     buttons = [
+        [InlineKeyboardButton(text="⚡ 1 день — 20₽", callback_data="buy_telegram_daily")],
         [InlineKeyboardButton(text="💳 Месячная — 490₽", callback_data="buy_telegram_monthly"),
          InlineKeyboardButton(text="💎 Годовая — 4680₽", callback_data="buy_telegram_yearly")],
         [InlineKeyboardButton(text="◀️ Назад к подпискам", callback_data="premium")],

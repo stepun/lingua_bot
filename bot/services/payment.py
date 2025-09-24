@@ -16,7 +16,9 @@ class TelegramPaymentService:
 
     def get_subscription_price(self, subscription_type: str) -> float:
         """Get subscription price"""
-        if subscription_type == "monthly":
+        if subscription_type == "daily":
+            return config.DAILY_PRICE
+        elif subscription_type == "monthly":
             return config.MONTHLY_PRICE
         elif subscription_type == "yearly":
             return config.YEARLY_PRICE
@@ -24,7 +26,9 @@ class TelegramPaymentService:
 
     def get_subscription_description(self, subscription_type: str) -> str:
         """Get subscription description"""
-        if subscription_type == "monthly":
+        if subscription_type == "daily":
+            return "Премиум подписка на 1 день"
+        elif subscription_type == "monthly":
             return "Премиум подписка на 1 месяц"
         elif subscription_type == "yearly":
             return "Премиум подписка на 1 год"

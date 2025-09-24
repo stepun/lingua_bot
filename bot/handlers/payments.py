@@ -42,7 +42,7 @@ async def handle_telegram_payment(callback: CallbackQuery):
     subscription_type = callback.data[13:]  # Remove "buy_telegram_" prefix
     logger.info(f"Parsed subscription_type: {subscription_type}")
 
-    if subscription_type not in ["monthly", "yearly"]:
+    if subscription_type not in ["daily", "monthly", "yearly"]:
         await safe_callback_answer(callback,"❌ Неверный тип подписки", show_alert=True)
         return
 
