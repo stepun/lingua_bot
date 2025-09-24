@@ -365,6 +365,11 @@ async def voice_translation_handler(callback: CallbackQuery):
     metadata = last_translation_metadata.get(user_id, {})
     has_alternatives = bool(metadata.get('alternatives') and len(metadata.get('alternatives', [])) > 0)
 
+    # If no alternatives in memory, check if we have translation history as fallback
+    if not has_alternatives:
+        history = await db.get_user_history(user_id, limit=1)
+        has_alternatives = bool(history)  # Show alternatives if there's any translation history
+
     # Get interface language
     interface_lang = user_info.get('interface_language', 'ru')
 
@@ -789,6 +794,12 @@ async def back_to_voice_menu_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
     metadata = last_translation_metadata.get(user_id, {})
     has_alternatives = bool(metadata.get('alternatives') and len(metadata.get('alternatives', [])) > 0)
+
+    # If no alternatives in memory, check if we have translation history as fallback
+    if not has_alternatives:
+        history = await db.get_user_history(user_id, limit=1)
+        has_alternatives = bool(history)  # Show alternatives if there's any translation history
+
     interface_lang = user_info.get('interface_language', 'ru')
 
     voice_text = {
