@@ -536,6 +536,13 @@ async def voice_exact_handler(callback: CallbackQuery):
     metadata = last_translation_metadata.get(user_id, {})
     exact_text = metadata.get('basic_translation', '')
 
+    # If no basic translation in memory, try to get from last translation
+    if not exact_text:
+        history = await db.get_translation_history(user_id, limit=1)
+        if history:
+            # Use the translated text from the last translation as fallback
+            exact_text = history[0]['translated_text']
+
     await generate_voice_for_text(callback, exact_text, "точный перевод")
 
 @router.callback_query(F.data == "voice_styled")
@@ -558,6 +565,13 @@ async def voice_styled_handler(callback: CallbackQuery):
 
     # Try to get enhanced translation, fallback to basic if not available
     styled_text = metadata.get('enhanced_translation', metadata.get('basic_translation', ''))
+
+    # If no styled text in memory, try to get from last translation
+    if not styled_text:
+        history = await db.get_translation_history(user_id, limit=1)
+        if history:
+            # Use the translated text from the last translation as fallback
+            styled_text = history[0]['translated_text']
 
     await generate_voice_for_text(callback, styled_text, "стилизованный перевод")
 
