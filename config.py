@@ -31,7 +31,7 @@ class Config:
     DATABASE_PATH = os.getenv("DATABASE_PATH", "data/bot.db")
 
     # Subscription Prices
-    DAILY_PRICE = int(os.getenv("DAILY_PRICE", "20"))
+    DAILY_PRICE = int(os.getenv("DAILY_PRICE", "100"))
     MONTHLY_PRICE = int(os.getenv("MONTHLY_PRICE", "490"))
     YEARLY_PRICE = int(os.getenv("YEARLY_PRICE", "4680"))
 
