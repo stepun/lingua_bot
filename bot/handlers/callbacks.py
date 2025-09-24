@@ -538,7 +538,7 @@ async def voice_exact_handler(callback: CallbackQuery):
 
     # If no basic translation in memory, try to get from last translation
     if not exact_text:
-        history = await db.get_translation_history(user_id, limit=1)
+        history = await db.get_user_history(user_id, limit=1)
         if history:
             # Use the translated text from the last translation as fallback
             exact_text = history[0]['translated_text']
@@ -568,7 +568,7 @@ async def voice_styled_handler(callback: CallbackQuery):
 
     # If no styled text in memory, try to get from last translation
     if not styled_text:
-        history = await db.get_translation_history(user_id, limit=1)
+        history = await db.get_user_history(user_id, limit=1)
         if history:
             # Use the translated text from the last translation as fallback
             styled_text = history[0]['translated_text']
