@@ -134,6 +134,8 @@ class Config:
     # Webhook Configuration (for production)
     WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
     WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+    WEBHOOK_MODE = os.getenv("WEBHOOK_MODE", "false").lower() == "true"
+    WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8000"))
     WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
     WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8080"))
 

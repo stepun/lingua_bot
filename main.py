@@ -102,14 +102,16 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Check if running on Railway or similar cloud platform
+    # Check if webhook mode is enabled
     port = int(os.getenv("PORT", "0"))
-    if port > 0:
+    if port > 0 or config.WEBHOOK_MODE:
         # Running on cloud platform - use webhook mode
         from aiohttp import web
         from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-        webhook_host = config.WEBHOOK_HOST or os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_URL") or f"https://localhost:{port}"
+        # Use configured port if no PORT env var
+        actual_port = port if port > 0 else config.WEBHOOK_PORT
+        webhook_host = config.WEBHOOK_HOST or os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_URL") or f"https://localhost:{actual_port}"
         webhook_path = config.WEBHOOK_PATH
         webhook_url = f"{webhook_host}{webhook_path}"
 
@@ -146,10 +148,10 @@ async def main():
         # Start web server
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', port)
+        site = web.TCPSite(runner, '0.0.0.0', actual_port)
         await site.start()
 
-        logger.info(f"🚀 PolyglotAI44 webhook server started on port {port}")
+        logger.info(f"🚀 PolyglotAI44 webhook server started on port {actual_port}")
 
         # Keep the server running
         try:
