@@ -541,6 +541,12 @@ async def voice_exact_handler(callback: CallbackQuery):
     metadata = last_translation_metadata.get(user_id, {})
     exact_text = metadata.get('basic_translation', '')
 
+    # If no basic translation in memory, get from history
+    if not exact_text:
+        history = await db.get_user_history(user_id, limit=1)
+        if history and history[0].get('basic_translation'):
+            exact_text = history[0]['basic_translation']
+
     await generate_voice_for_text(callback, exact_text, "точный перевод")
 
 @router.callback_query(F.data == "voice_styled")
@@ -563,6 +569,14 @@ async def voice_styled_handler(callback: CallbackQuery):
 
     # Try to get enhanced translation, fallback to basic if not available
     styled_text = metadata.get('enhanced_translation', metadata.get('basic_translation', ''))
+
+    # If no styled text in memory, get from history
+    if not styled_text:
+        history = await db.get_user_history(user_id, limit=1)
+        if history:
+            # Prefer enhanced translation, fallback to regular translated_text
+            styled_text = (history[0].get('enhanced_translation') or
+                          history[0].get('translated_text', ''))
 
     await generate_voice_for_text(callback, styled_text, "стилизованный перевод")
 
@@ -587,15 +601,19 @@ async def voice_alternatives_handler(callback: CallbackQuery):
 
     # If no alternatives in metadata, try to use styled or basic translation as fallback
     if not alternatives:
-        # Prefer enhanced translation as "alternative" if available
+        # First try metadata
         fallback_text = metadata.get('enhanced_translation') or metadata.get('basic_translation', '')
         if fallback_text:
             alternatives = [fallback_text]
         else:
-            # Last resort: get from database
+            # Get from database - prefer enhanced as alternative
             history = await db.get_user_history(user_id, limit=1)
             if history:
-                alternatives = [history[0]['translated_text']]
+                alt_text = (history[0].get('enhanced_translation') or
+                           history[0].get('basic_translation') or
+                           history[0].get('translated_text', ''))
+                if alt_text:
+                    alternatives = [alt_text]
 
     if not alternatives:
         await callback.answer("❌ Альтернативы недоступны", show_alert=True)

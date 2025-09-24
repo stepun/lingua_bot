@@ -43,6 +43,8 @@ class Database:
                     source_text TEXT,
                     source_language TEXT,
                     translated_text TEXT,
+                    basic_translation TEXT,
+                    enhanced_translation TEXT,
                     target_language TEXT,
                     translation_style TEXT,
                     is_voice BOOLEAN DEFAULT 0,
@@ -96,6 +98,17 @@ class Database:
                     revenue REAL DEFAULT 0
                 )
             ''')
+
+            # Migration: Add new columns if they don't exist
+            try:
+                await db.execute('ALTER TABLE translation_history ADD COLUMN basic_translation TEXT')
+            except:
+                pass  # Column already exists
+
+            try:
+                await db.execute('ALTER TABLE translation_history ADD COLUMN enhanced_translation TEXT')
+            except:
+                pass  # Column already exists
 
             await db.commit()
 
@@ -283,7 +296,9 @@ class Database:
     async def add_translation_history(self, user_id: int, source_text: str,
                                      source_language: str, translated_text: str,
                                      target_language: str, style: str = 'informal',
-                                     is_voice: bool = False) -> bool:
+                                     is_voice: bool = False,
+                                     basic_translation: str = None,
+                                     enhanced_translation: str = None) -> bool:
         """Add translation to history"""
         async with aiosqlite.connect(self.db_path) as db:
             # Check if history saving is enabled
@@ -296,9 +311,11 @@ class Database:
                 await db.execute('''
                     INSERT INTO translation_history (
                         user_id, source_text, source_language, translated_text,
+                        basic_translation, enhanced_translation,
                         target_language, translation_style, is_voice
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (user_id, source_text, source_language, translated_text,
+                     basic_translation, enhanced_translation,
                      target_language, style, is_voice))
 
                 # Clean old history (keep only last MAX_HISTORY_ITEMS)
