@@ -93,9 +93,9 @@ async def main():
 
     # Register routers
     dp.include_router(admin.router)  # Admin router first for priority
-    dp.include_router(base.router)
+    dp.include_router(payments.router)  # Payments router before base to catch successful_payment
     dp.include_router(callbacks.router)
-    dp.include_router(payments.router)
+    dp.include_router(base.router)  # Base router last to avoid intercepting specific handlers
     dp.include_router(export.router)
 
     # Set startup and shutdown handlers

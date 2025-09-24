@@ -69,7 +69,7 @@ async def handle_telegram_payment(callback: CallbackQuery):
 
     if not invoice_data:
         if not config.PROVIDER_TOKEN:
-            error_text = "❌ Платежная система Telegram временно недоступна.\\n\\n🔧 Администратор не настроил PROVIDER_TOKEN."
+            error_text = "❌ Платежная система Telegram временно недоступна.\n\n🔧 Администратор не настроил PROVIDER_TOKEN."
         else:
             error_text = "❌ Ошибка при создании счета. Попробуйте позже."
 
