@@ -76,7 +76,7 @@ class Database:
                     save_history BOOLEAN DEFAULT 1,
                     notifications_enabled BOOLEAN DEFAULT 1,
                     voice_speed REAL DEFAULT 1.0,
-                    voice_type TEXT DEFAULT 'standard',
+                    voice_type TEXT DEFAULT 'alloy',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)

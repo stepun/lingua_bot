@@ -172,7 +172,7 @@ def get_voice_speed_keyboard(current_speed: float = 1.0) -> InlineKeyboardMarkup
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_voice_type_keyboard(current_type: str = 'standard') -> InlineKeyboardMarkup:
+def get_voice_type_keyboard(current_type: str = 'alloy') -> InlineKeyboardMarkup:
     """Voice type selection keyboard"""
     voices = [
         ('alloy', '👨 Мужской 1'),
