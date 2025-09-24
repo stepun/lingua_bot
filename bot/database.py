@@ -45,6 +45,7 @@ class Database:
                     translated_text TEXT,
                     basic_translation TEXT,
                     enhanced_translation TEXT,
+                    alternatives TEXT,
                     target_language TEXT,
                     translation_style TEXT,
                     is_voice BOOLEAN DEFAULT 0,
@@ -107,6 +108,11 @@ class Database:
 
             try:
                 await db.execute('ALTER TABLE translation_history ADD COLUMN enhanced_translation TEXT')
+            except:
+                pass  # Column already exists
+
+            try:
+                await db.execute('ALTER TABLE translation_history ADD COLUMN alternatives TEXT')
             except:
                 pass  # Column already exists
 
@@ -298,7 +304,8 @@ class Database:
                                      target_language: str, style: str = 'informal',
                                      is_voice: bool = False,
                                      basic_translation: str = None,
-                                     enhanced_translation: str = None) -> bool:
+                                     enhanced_translation: str = None,
+                                     alternatives: list = None) -> bool:
         """Add translation to history"""
         async with aiosqlite.connect(self.db_path) as db:
             # Check if history saving is enabled
@@ -308,14 +315,20 @@ class Database:
             row = await cursor.fetchone()
 
             if row and row[0]:
+                # Convert alternatives list to JSON string for storage
+                alternatives_json = None
+                if alternatives:
+                    import json
+                    alternatives_json = json.dumps(alternatives, ensure_ascii=False)
+
                 await db.execute('''
                     INSERT INTO translation_history (
                         user_id, source_text, source_language, translated_text,
-                        basic_translation, enhanced_translation,
+                        basic_translation, enhanced_translation, alternatives,
                         target_language, translation_style, is_voice
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (user_id, source_text, source_language, translated_text,
-                     basic_translation, enhanced_translation,
+                     basic_translation, enhanced_translation, alternatives_json,
                      target_language, style, is_voice))
 
                 # Clean old history (keep only last MAX_HISTORY_ITEMS)

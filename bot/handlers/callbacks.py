@@ -594,26 +594,20 @@ async def voice_alternatives_handler(callback: CallbackQuery):
         await callback.answer()
         return
 
-    # Get alternatives from metadata
+    # Get alternatives from metadata first
     user_id = callback.from_user.id
     metadata = last_translation_metadata.get(user_id, {})
     alternatives = metadata.get('alternatives', [])
 
-    # If no alternatives in metadata, try to use styled or basic translation as fallback
+    # If no alternatives in memory, try to get from database
     if not alternatives:
-        # First try metadata
-        fallback_text = metadata.get('enhanced_translation') or metadata.get('basic_translation', '')
-        if fallback_text:
-            alternatives = [fallback_text]
-        else:
-            # Get from database - prefer enhanced as alternative
-            history = await db.get_user_history(user_id, limit=1)
-            if history:
-                alt_text = (history[0].get('enhanced_translation') or
-                           history[0].get('basic_translation') or
-                           history[0].get('translated_text', ''))
-                if alt_text:
-                    alternatives = [alt_text]
+        history = await db.get_user_history(user_id, limit=1)
+        if history and history[0].get('alternatives'):
+            import json
+            try:
+                alternatives = json.loads(history[0]['alternatives'])
+            except (json.JSONDecodeError, TypeError):
+                alternatives = []
 
     if not alternatives:
         await callback.answer("❌ Альтернативы недоступны", show_alert=True)

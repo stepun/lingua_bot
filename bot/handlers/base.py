@@ -207,7 +207,8 @@ async def voice_handler(message: Message):
                     style=style,
                     is_voice=True,
                     basic_translation=metadata.get('basic_translation'),
-                    enhanced_translation=metadata.get('enhanced_translation', translated)
+                    enhanced_translation=metadata.get('enhanced_translation', translated),
+                    alternatives=metadata.get('alternatives')
                 )
 
                 # Get style display name
@@ -350,7 +351,8 @@ async def text_translation_handler(message: Message):
                 style=style,
                 is_voice=False,
                 basic_translation=metadata.get('basic_translation'),
-                enhanced_translation=metadata.get('enhanced_translation', translated)
+                enhanced_translation=metadata.get('enhanced_translation', translated),
+                alternatives=metadata.get('alternatives')
             )
             logger.info("Database updates completed")
 
