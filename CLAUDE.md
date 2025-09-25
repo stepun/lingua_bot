@@ -124,9 +124,55 @@ The Docker setup runs `main.py` (full version) by default, not the minimal versi
 - `logs/` - Application logs
 - `exports/` - Generated PDF/TXT exports
 
+## Remote Server Access
+
+SSH credentials and deployment info are in `creds.md`:
+- Server: `ssh vokhma1v@vokhma1v.beget.tech`
+- Project path: `/home/v/vokhma1v/vokhma1v.beget.tech/lingua_bot`
+
+### Server Management Scripts
+```bash
+# Server deployment and management
+./start_beget.sh              # Start bot on Beget server
+./stop_beget.sh               # Stop bot on server
+./status.sh                   # Check bot status
+./check_and_restart.sh        # Restart if crashed
+
+# Development/local
+./start_bot.sh                # Start bot locally
+./start_monitor.sh            # Start with monitoring
+```
+
+## Database Schema
+
+### Enhanced Translation History
+The `translation_history` table stores comprehensive translation data:
+- `basic_translation` - Direct translation result
+- `enhanced_translation` - GPT-4o enhanced version
+- `alternatives` - JSON array of alternative translations
+- Enables proper voice synthesis for exact/styled/alternative translations
+
+### Voice Handler Architecture
+Voice handlers have strict data isolation:
+- **Voice Exact** → uses `basic_translation` from metadata/history
+- **Voice Styled** → uses `enhanced_translation` from metadata/history
+- **Voice Alternatives** → uses parsed JSON `alternatives` from metadata/history
+- Fallback logic queries database when `last_translation_metadata` is empty
+
+## Translation Metadata Flow
+
+1. **Memory Storage**: `last_translation_metadata` dict stores current session data
+2. **Database Persistence**: All translations saved with basic/enhanced/alternatives fields
+3. **Voice Handlers**: Use memory first, fallback to database for reliability
+4. **Data Isolation**: Each voice type has dedicated data source to prevent mixing
+
 ## Common Issues
 
 1. **Module import errors**: Use `main_minimal.py` for environments without pip/venv
 2. **ADMIN_IDS format**: Must be numeric Telegram user ID, not username/URL
 3. **Docker not starting**: Ensure Docker Desktop is installed and WSL integration enabled
 4. **Translation failures**: Check API keys and account balances, services fail gracefully
+5. **Voice TTS errors**:
+   - Invalid voice_type (must be: alloy, echo, fable, onyx, nova, shimmer, ash, sage, coral)
+   - Check OpenAI API key and ElevenLabs configuration
+   - Ensure Telegram voice message permissions are enabled

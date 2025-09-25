@@ -45,13 +45,36 @@ class TelegramPaymentService:
 
             price_kopecks = int(amount * 100)
 
+            # Provider data for YooKassa receipt
+            provider_data = {
+                "receipt": {
+                    "items": [
+                        {
+                            "description": f"LinguaBot Premium подписка ({subscription_type})",
+                            "quantity": 1,
+                            "amount": {
+                                "value": amount,  # Amount in rubles for receipt
+                                "currency": "RUB"
+                            },
+                            "vat_code": 1,
+                            "payment_mode": "full_payment",
+                            "payment_subject": "service"
+                        }
+                    ],
+                    "tax_system_code": 1
+                }
+            }
+
             payment_data = {
                 "title": f"Premium подписка - {subscription_type}",
                 "description": description or f"LinguaBot Premium {subscription_type} подписка",
                 "provider_token": config.PROVIDER_TOKEN,
                 "currency": "RUB",
                 "prices": [LabeledPrice(label=f"Подписка {subscription_type}", amount=price_kopecks)],
-                "payload": f"{user_id}:{subscription_type}:{amount}"
+                "payload": f"{user_id}:{subscription_type}:{amount}",
+                "need_email": True,
+                "send_email_to_provider": True,
+                "provider_data": json.dumps(provider_data)
             }
 
             # Store LabeledPrice class for use in handlers
