@@ -34,6 +34,8 @@ MANIFEST
 venv/
 env/
 ENV/
+new_venv/
+wsl_venv/
 
 # IDEs
 .vscode/
@@ -83,3 +85,20 @@ htmlcov/
 
 # Documentation build
 docs/_build/
+
+# Railway CLI binary and archives
+railway
+railway.tar.gz
+*.tar.gz
+
+# Installation scripts
+get-pip.py
+get-docker.sh
+
+# Railway config (keep only .railway/ directory)
+.railway-link.json
+
+# Railway debug scripts
+debug_railway.py
+get_railway_url.py
+check_your_railway.py
