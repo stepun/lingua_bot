@@ -77,13 +77,21 @@ async function init() {
     try {
         showLoading();
 
-        // Get current user info from Telegram
+        // Get current user info from Telegram or URL params
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             currentUser = tg.initDataUnsafe.user;
             document.getElementById('userInfo').textContent =
                 `${currentUser.first_name || currentUser.username || 'Admin'}`;
         } else {
-            document.getElementById('userInfo').textContent = 'Admin';
+            // Fallback: get user_id from URL for browser testing
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+            if (userId) {
+                currentUser = { id: parseInt(userId) };
+                document.getElementById('userInfo').textContent = `Admin (ID: ${userId})`;
+            } else {
+                document.getElementById('userInfo').textContent = 'Admin';
+            }
         }
 
         // Set up theme

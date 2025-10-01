@@ -119,10 +119,20 @@ class PostgreSQLConnection:
         self.is_postgres = True
 
     async def execute(self, query: str, *args):
-        """Execute query - returns cursor-like object"""
+        """Execute query - returns cursor-like object or status"""
         # Convert ? to $1, $2, etc for PostgreSQL
         pg_query = self._convert_placeholders(query)
-        # Return cursor-like object for compatibility
+
+        # Check if this is a DDL/DML statement that doesn't return rows
+        query_upper = pg_query.strip().upper()
+        if any(query_upper.startswith(cmd) for cmd in ['CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE', 'DELETE']):
+            # Execute directly and return status
+            if args:
+                return await self.conn.execute(pg_query, *args)
+            else:
+                return await self.conn.execute(pg_query)
+
+        # Return cursor-like object for SELECT queries
         return PostgreSQLCursor(self.conn, pg_query, args)
 
     async def fetchone(self, query: str, *args):

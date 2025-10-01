@@ -257,10 +257,11 @@ class Database:
 
                     if subscription_expired:
                         # Reset to non-premium
-                        await conn.execute('''
+                        premium_false = "FALSE" if db_adapter.is_postgres else "0"
+                        await conn.execute(f'''
                             UPDATE users SET
                                 username = ?, first_name = ?, last_name = ?, language_code = ?,
-                                interface_language = ?, is_premium = 0, premium_until = NULL, updated_at = ?
+                                interface_language = ?, is_premium = {premium_false}, premium_until = NULL, updated_at = ?
                             WHERE user_id = ?
                         ''', username, first_name, last_name, language_code,
                              language_code, datetime.now(), user_id)
@@ -355,8 +356,9 @@ class Database:
                 premium_until = datetime.fromisoformat(premium_until)
                 if premium_until < datetime.now():
                     # Premium expired
-                    await conn.execute('''
-                        UPDATE users SET is_premium = 0 WHERE user_id = ?
+                    premium_false = "FALSE" if db_adapter.is_postgres else "0"
+                    await conn.execute(f'''
+                        UPDATE users SET is_premium = {premium_false} WHERE user_id = ?
                     ''', user_id)
                     await conn.commit()
                     is_premium = False
@@ -485,9 +487,10 @@ class Database:
                  'active', now, expires_at)
 
             # Update user premium status
-            await conn.execute('''
+            premium_value = "TRUE" if db_adapter.is_postgres else "1"
+            await conn.execute(f'''
                 UPDATE users
-                SET is_premium = 1, premium_until = ?
+                SET is_premium = {premium_value}, premium_until = ?
                 WHERE user_id = ?
             ''', expires_at, user_id)
 
@@ -500,21 +503,25 @@ class Database:
             date = datetime.now().date()
 
         async with db_adapter.get_connection() as conn:
+            # Build boolean comparison based on database type
+            premium_check = "is_premium = TRUE" if db_adapter.is_postgres else "is_premium = 1"
+            voice_check = "is_voice = TRUE" if db_adapter.is_postgres else "is_voice = 1"
+
             # Get user statistics
-            cursor = await conn.execute('''
+            cursor = await conn.execute(f'''
                 SELECT
                     COUNT(*) as total_users,
                     SUM(CASE WHEN last_translation_date = ? THEN 1 ELSE 0 END) as active_users,
-                    SUM(CASE WHEN is_premium = 1 THEN 1 ELSE 0 END) as premium_users
+                    SUM(CASE WHEN {premium_check} THEN 1 ELSE 0 END) as premium_users
                 FROM users
             ''', date)
             user_stats = await cursor.fetchone()
 
             # Get translation statistics
-            cursor = await conn.execute('''
+            cursor = await conn.execute(f'''
                 SELECT
                     COUNT(*) as total_translations,
-                    SUM(CASE WHEN is_voice = 1 THEN 1 ELSE 0 END) as voice_translations
+                    SUM(CASE WHEN {voice_check} THEN 1 ELSE 0 END) as voice_translations
                 FROM translation_history
                 WHERE DATE(created_at) = ?
             ''', date)
@@ -572,9 +579,10 @@ class Database:
     async def get_premium_user_count(self) -> int:
         """Get premium user count"""
         async with db_adapter.get_connection() as conn:
-            cursor = await conn.execute('''
+            premium_check = "is_premium = TRUE" if db_adapter.is_postgres else "is_premium = 1"
+            cursor = await conn.execute(f'''
                 SELECT COUNT(*) FROM users
-                WHERE is_premium = 1 AND (premium_until IS NULL OR premium_until > ?)
+                WHERE {premium_check} AND (premium_until IS NULL OR premium_until > ?)
             ''', datetime.now())
             result = await cursor.fetchone()
             return result[0] if result else 0

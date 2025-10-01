@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from bot.database import Database
+from bot.db_adapter import db_adapter
 import aiosqlite
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -21,9 +22,7 @@ async def get_users(
     try:
         offset = (page - 1) * per_page
 
-        async with aiosqlite.connect(db.db_path) as conn:
-            conn.row_factory = aiosqlite.Row
-
+        async with db_adapter.get_connection() as conn:
             # Build query
             query = "SELECT * FROM users WHERE 1=1"
             params = []
@@ -34,19 +33,26 @@ async def get_users(
                 params.extend([search_param, search_param, search_param])
 
             if premium_only:
-                query += " AND is_premium = 1"
+                if db_adapter.is_postgres:
+                    query += " AND is_premium = TRUE"
+                else:
+                    query += " AND is_premium = 1"
 
             # Count total
             count_query = query.replace("SELECT *", "SELECT COUNT(*)")
-            cursor = await conn.execute(count_query, params)
-            total = (await cursor.fetchone())[0]
+            rows = await conn.fetchall(count_query, *params)
+            total = rows[0][0] if rows else 0
 
             # Get paginated results
             query += f" ORDER BY created_at DESC LIMIT ? OFFSET ?"
             params.extend([per_page, offset])
 
-            cursor = await conn.execute(query, params)
-            users = [dict(row) for row in await cursor.fetchall()]
+            rows = await conn.fetchall(query, *params)
+            users = [dict(zip(['user_id', 'username', 'first_name', 'last_name', 'language_code',
+                              'interface_language', 'target_language', 'translation_style',
+                              'is_premium', 'premium_until', 'free_translations_today',
+                              'last_translation_date', 'total_translations', 'created_at', 'updated_at'],
+                             row)) for row in rows]
 
             return {
                 "users": users,
