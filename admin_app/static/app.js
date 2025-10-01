@@ -326,8 +326,18 @@ async function loadLogs() {
     try {
         showLoading();
 
+        // Get filter value
+        const filterSelect = document.getElementById('logFilter');
+        const filterValue = filterSelect ? filterSelect.value : '';
+
+        // Build URL with filter
+        let url = '/api/logs/translations?per_page=20';
+        if (filterValue) {
+            url += `&filter=${filterValue}`;
+        }
+
         // Load translation logs
-        const logsData = await apiRequest('/api/logs/translations?per_page=20');
+        const logsData = await apiRequest(url);
         renderTranslationLogs(logsData.logs);
 
         // System logs temporarily disabled (not implemented)
@@ -387,6 +397,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('nextPage').addEventListener('click', () => {
         loadUsers(currentPage + 1);
     });
+
+    // Log filter
+    document.getElementById('logFilter').addEventListener('change', loadLogs);
 
     // Refresh logs
     document.getElementById('refreshLogs').addEventListener('click', loadLogs);
