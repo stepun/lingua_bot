@@ -3,6 +3,7 @@ from aiogram.types import Message, CallbackQuery, Voice, Audio, Document
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 import logging
+import time
 
 from bot.database import db
 from bot.keyboards.inline import get_main_menu_keyboard, get_translation_actions_keyboard
@@ -116,6 +117,59 @@ async def settings_handler(message: Message):
 
     await message.answer(text, reply_markup=get_settings_keyboard(user_info))
 
+@router.message(Command("feedback"))
+async def feedback_handler(message: Message):
+    """Handle feedback command"""
+    user_info = await db.get_user(message.from_user.id)
+    interface_lang = user_info.get('interface_language', 'ru')
+
+    # Extract feedback message from command
+    feedback_text = message.text.split(maxsplit=1)
+
+    if len(feedback_text) < 2:
+        # No feedback text provided
+        if interface_lang == 'ru':
+            await message.answer(
+                "📝 Отправьте отзыв или сообщение о проблеме:\n\n"
+                "Используйте: /feedback [ваше сообщение]\n\n"
+                "Например:\n"
+                "/feedback Отличный бот, но хотелось бы добавить поддержку японского языка"
+            )
+        else:
+            await message.answer(
+                "📝 Send feedback or report a problem:\n\n"
+                "Usage: /feedback [your message]\n\n"
+                "Example:\n"
+                "/feedback Great bot, but would love to see Japanese language support"
+            )
+        return
+
+    feedback_message = feedback_text[1].strip()
+
+    # Save feedback to database
+    success = await db.add_feedback(message.from_user.id, feedback_message)
+
+    if success:
+        if interface_lang == 'ru':
+            await message.answer(
+                "✅ Спасибо за ваш отзыв!\n\n"
+                "Ваше сообщение получено и будет рассмотрено администрацией."
+            )
+        else:
+            await message.answer(
+                "✅ Thank you for your feedback!\n\n"
+                "Your message has been received and will be reviewed by the administration."
+            )
+    else:
+        if interface_lang == 'ru':
+            await message.answer(
+                "❌ Ошибка при сохранении отзыва. Попробуйте позже."
+            )
+        else:
+            await message.answer(
+                "❌ Error saving feedback. Please try again later."
+            )
+
 @router.message(Command("history", "история"))
 async def history_handler(message: Message):
     """Handle history command"""
@@ -146,6 +200,7 @@ async def history_handler(message: Message):
 @rate_limit(key='voice', rate=5, per=60)
 async def voice_handler(message: Message):
     """Handle voice messages"""
+    start_time = time.time()
     user_info = await db.get_user(message.from_user.id)
 
     # Check if user can use voice features
@@ -197,6 +252,7 @@ async def voice_handler(message: Message):
                     return
 
                 # Update counters
+                processing_time = int((time.time() - start_time) * 1000)  # Convert to milliseconds
                 await db.increment_translation_count(message.from_user.id)
                 await db.add_translation_history(
                     user_id=message.from_user.id,
@@ -208,7 +264,8 @@ async def voice_handler(message: Message):
                     is_voice=True,
                     basic_translation=metadata.get('basic_translation'),
                     enhanced_translation=metadata.get('enhanced_translation', translated),
-                    alternatives=metadata.get('alternatives')
+                    alternatives=metadata.get('alternatives'),
+                    processing_time_ms=processing_time
                 )
 
                 # Get style display name
@@ -266,6 +323,7 @@ async def voice_handler(message: Message):
 @rate_limit(key='translation', rate=10, per=60)
 async def text_translation_handler(message: Message):
     """Handle text translation"""
+    start_time = time.time()
     user_info = await db.get_user(message.from_user.id)
 
     # Handle keyboard button presses
@@ -341,6 +399,7 @@ async def text_translation_handler(message: Message):
 
             # Update counters
             logger.info("Starting database updates...")
+            processing_time = int((time.time() - start_time) * 1000)  # Convert to milliseconds
             await db.increment_translation_count(message.from_user.id)
             await db.add_translation_history(
                 user_id=message.from_user.id,
@@ -352,7 +411,8 @@ async def text_translation_handler(message: Message):
                 is_voice=False,
                 basic_translation=metadata.get('basic_translation'),
                 enhanced_translation=metadata.get('enhanced_translation', translated),
-                alternatives=metadata.get('alternatives')
+                alternatives=metadata.get('alternatives'),
+                processing_time_ms=processing_time
             )
             logger.info("Database updates completed")
 

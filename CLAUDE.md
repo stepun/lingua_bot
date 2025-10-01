@@ -31,7 +31,7 @@ All configuration is centralized in `config.py` with environment variable loadin
 - Database path, pricing, limits all configurable
 
 ### Database Architecture
-SQLite-based with async operations in `bot/database.py`:
+PostgreSQL-based with async operations in `bot/database.py`:
 - User management with subscription tracking
 - Daily usage limits and premium features
 - Translation history storage
@@ -116,7 +116,7 @@ Optional but recommended:
 Multi-stage Dockerfile optimized for production:
 - Python 3.11 slim base
 - Non-root user (linguabot)
-- Health checks via SQLite connection test
+- Health checks via PostgreSQL connection test
 - Resource limits: 512MB RAM, 0.5 CPU
 - Volume mounts for persistent data: `./data`, `./logs`, `./exports`
 
@@ -129,7 +129,7 @@ The Docker setup runs `main.py` (full version) by default, not the minimal versi
 - `bot/keyboards/` - Telegram UI components
 - `bot/middlewares/` - Request processing middleware
 - `bot/utils/` - Shared utilities and messages
-- `data/` - SQLite database and user data
+- `data/` - PostgreSQL database backups and user data
 - `logs/` - Application logs
 - `exports/` - Generated PDF/TXT exports
 
@@ -207,3 +207,76 @@ The codebase includes several test files:
    - Check OpenAI API key and ElevenLabs configuration
    - Ensure Telegram voice message permissions are enabled
 6. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation
+7. **Admin panel database connection errors in Docker**:
+   - **Symptom**: Admin panel shows "Loading..." forever, API endpoints return 500 errors with `socket.gaierror: [Errno -2] Name or service not known`
+   - **Cause**: Postgres container in different Docker network (e.g., "bridge" instead of "linguabot_dev_network")
+   - **Fix**: Fully recreate all containers:
+     ```bash
+     docker stop linguabot_postgres_dev && docker rm linguabot_postgres_dev
+     docker compose -f docker-compose.dev.yml down
+     docker compose -f docker-compose.dev.yml up -d
+     ```
+   - **Why it happens**: When using `docker compose up -d --force-recreate --no-deps linguabot`, only the bot container is recreated, leaving postgres in the old network
+   - **How to verify fix**: Check both containers are in the same network:
+     ```bash
+     docker network inspect linguabot_dev_network --format '{{range $key, $value := .Containers}}{{$value.Name}}{{"\n"}}{{end}}'
+     # Should show both: linguabot_postgres_dev and linguabot_dev
+     ```
+## Database Migrations System
+
+The project uses a custom versioned migrations system to prevent schema inconsistencies.
+
+### How It Works
+
+1. **Tracking Table**: `schema_migrations` stores applied migration versions
+2. **Migration Files**: Stored in `migrations/` directory with format `XXX_description.sql`
+3. **Auto-Apply**: Migrations run automatically on bot startup via `Database.apply_migrations()` (bot/database.py:295)
+4. **Idempotent**: All migrations use `ADD COLUMN IF NOT EXISTS` to safely re-run
+
+### Migration Naming Convention
+
+```
+XXX_description.sql
+```
+
+- `XXX`: 3-digit version number (001, 002, ...)
+- `description`: Snake_case description
+
+### Creating a New Migration
+
+1. Create file in `migrations/`:
+   ```bash
+   touch migrations/003_add_new_feature.sql
+   ```
+
+2. Write idempotent SQL:
+   ```sql
+   -- Migration 003: Add new feature
+   -- Date: 2025-10-01
+   -- Task: 3.5 - Feature description
+
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS new_field TEXT DEFAULT '';
+   ```
+
+3. Restart bot to apply:
+   ```bash
+   docker compose -f docker-compose.dev.yml restart linguabot
+   ```
+
+4. Verify:
+   ```bash
+   docker exec linguabot_postgres_dev psql -U linguabot -d linguabot -c "SELECT * FROM schema_migrations;"
+   ```
+
+### Existing Migrations
+
+- `001_add_is_blocked.sql`: User blocking feature (Task 2.1)
+- `002_add_performance_metrics.sql`: Performance tracking (Task 2.4)
+
+### Important Notes
+
+- ⚠️ **Never delete or modify existing migration files**
+- ⚠️ **Never change version numbers of applied migrations**
+- ✅ **Always use `IF NOT EXISTS` / `IF EXISTS` for safety**
+- ✅ **Always test on dev environment first**
+- ✅ **Docker volume `postgres_dev_data` persists data between restarts**

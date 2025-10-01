@@ -39,6 +39,8 @@ services:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://linguabot:devpassword123@postgres:5432/linguabot
       - PORT=8080
+      - WEBHOOK_HOST=https://88ac56bfbc4e.ngrok-free.app
+      - ADMIN_PANEL_URL=https://88ac56bfbc4e.ngrok-free.app
 
     volumes:
       - ./data:/home/linguabot/app/data

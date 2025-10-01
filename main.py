@@ -162,7 +162,26 @@ async def main():
             await runner.cleanup()
             await bot.session.close()
     else:
-        # Local development - use polling mode
+        # Local development - use polling mode with admin panel
+        from aiohttp import web
+        from admin_app.app import setup_admin_routes
+        from webhook import WebhookHandler
+
+        # Create admin panel app
+        app = web.Application()
+        setup_admin_routes(app)
+
+        # Add webhook endpoint for YooKassa
+        webhook_handler = WebhookHandler()
+        app.router.add_post('/webhook/yookassa', webhook_handler.handle_yookassa_webhook)
+
+        # Start admin panel server
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        logger.info("🌐 Admin panel started on http://0.0.0.0:8080")
+
         try:
             logger.info("🤖 PolyglotAI44 is starting in polling mode...")
             await dp.start_polling(
@@ -172,6 +191,7 @@ async def main():
         except Exception as e:
             logger.error(f"Bot startup error: {e}")
         finally:
+            await runner.cleanup()
             await bot.session.close()
 
 if __name__ == "__main__":

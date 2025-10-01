@@ -33,6 +33,7 @@ class Database:
                         target_language TEXT DEFAULT 'en',
                         translation_style TEXT DEFAULT 'informal',
                         is_premium {bool_type} DEFAULT FALSE,
+                        is_blocked {bool_type} DEFAULT FALSE,
                         premium_until {ts_type},
                         free_translations_today INTEGER DEFAULT 0,
                         last_translation_date DATE,
@@ -53,6 +54,7 @@ class Database:
                         target_language TEXT DEFAULT 'en',
                         translation_style TEXT DEFAULT 'informal',
                         is_premium {bool_type} DEFAULT 0,
+                        is_blocked {bool_type} DEFAULT 0,
                         premium_until {ts_type},
                         free_translations_today INTEGER DEFAULT 0,
                         last_translation_date DATE,
@@ -77,6 +79,9 @@ class Database:
                         target_language TEXT,
                         translation_style TEXT,
                         is_voice {bool_type} DEFAULT FALSE,
+                        processing_time_ms INTEGER,
+                        status TEXT DEFAULT 'success',
+                        error_message TEXT,
                         created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
@@ -95,6 +100,9 @@ class Database:
                         target_language TEXT,
                         translation_style TEXT,
                         is_voice {bool_type} DEFAULT 0,
+                        processing_time_ms INTEGER,
+                        status TEXT DEFAULT 'success',
+                        error_message TEXT,
                         created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
@@ -192,6 +200,76 @@ class Database:
                     )
                 ''')
 
+            # Feedback table
+            if db_adapter.is_postgres:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS feedback (
+                        id {serial_type},
+                        user_id BIGINT,
+                        message TEXT NOT NULL,
+                        status TEXT DEFAULT 'new',
+                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    )
+                ''')
+            else:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS feedback (
+                        id {serial_type},
+                        user_id INTEGER,
+                        message TEXT NOT NULL,
+                        status TEXT DEFAULT 'new',
+                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    )
+                ''')
+
+            # Admin actions table
+            if db_adapter.is_postgres:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS admin_actions (
+                        id {serial_type},
+                        admin_user_id BIGINT NOT NULL,
+                        action TEXT NOT NULL,
+                        target_user_id BIGINT,
+                        details TEXT,
+                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (admin_user_id) REFERENCES users (user_id),
+                        FOREIGN KEY (target_user_id) REFERENCES users (user_id)
+                    )
+                ''')
+            else:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS admin_actions (
+                        id {serial_type},
+                        admin_user_id INTEGER NOT NULL,
+                        action TEXT NOT NULL,
+                        target_user_id INTEGER,
+                        details TEXT,
+                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (admin_user_id) REFERENCES users (user_id),
+                        FOREIGN KEY (target_user_id) REFERENCES users (user_id)
+                    )
+                ''')
+
+            # Schema migrations table
+            if db_adapter.is_postgres:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version TEXT PRIMARY KEY,
+                        applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+            else:
+                await conn.execute(f'''
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version TEXT PRIMARY KEY,
+                        applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
             # Migration: Add new columns if they don't exist (only for SQLite)
             if not db_adapter.is_postgres:
                 try:
@@ -210,6 +288,83 @@ class Database:
                     pass  # Column already exists
 
             await conn.commit()
+
+        # Apply migrations after initial schema setup
+        await self.apply_migrations()
+
+    async def apply_migrations(self):
+        """Apply pending database migrations from migrations/ folder"""
+        import os
+        import glob
+
+        migrations_dir = Path(__file__).parent.parent / 'migrations'
+        if not migrations_dir.exists():
+            print("[MIGRATIONS] No migrations directory found, skipping...")
+            return
+
+        # Get all .sql migration files sorted by version
+        migration_files = sorted(glob.glob(str(migrations_dir / '*.sql')))
+
+        if not migration_files:
+            print("[MIGRATIONS] No migration files found")
+            return
+
+        async with db_adapter.get_connection() as conn:
+            # Get applied migrations
+            applied = set()
+            try:
+                if db_adapter.is_postgres:
+                    # PostgreSQL: Use raw execute + fetchall
+                    rows = await conn.fetch('SELECT version FROM schema_migrations')
+                    applied = {row['version'] for row in rows}
+                else:
+                    # SQLite: Use fetchall with empty tuple
+                    rows = await conn.fetchall('SELECT version FROM schema_migrations', ())
+                    applied = {row[0] for row in rows}
+            except Exception as e:
+                # Table might not exist yet on first run, that's OK
+                pass
+
+            # Apply pending migrations
+            for migration_file in migration_files:
+                version = os.path.basename(migration_file)
+
+                if version in applied:
+                    continue
+
+                print(f"[MIGRATIONS] Applying {version}...")
+
+                try:
+                    # Read migration SQL
+                    with open(migration_file, 'r', encoding='utf-8') as f:
+                        sql = f.read()
+
+                    # Execute each statement (split by semicolons, excluding comments)
+                    statements = [s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]
+
+                    for statement in statements:
+                        if statement:
+                            await conn.execute(statement)
+
+                    # Mark migration as applied
+                    if db_adapter.is_postgres:
+                        await conn.execute(
+                            'INSERT INTO schema_migrations (version) VALUES ($1)',
+                            version
+                        )
+                    else:
+                        await conn.execute(
+                            'INSERT INTO schema_migrations (version) VALUES (?)',
+                            (version,)
+                        )
+
+                    await conn.commit()
+                    print(f"[MIGRATIONS] ✅ Applied {version}")
+
+                except Exception as e:
+                    print(f"[MIGRATIONS] ❌ Failed to apply {version}: {e}")
+                    # Continue with next migration even if one fails
+                    continue
 
     async def add_user(self, user_id: int, username: str = None, first_name: str = None,
                       last_name: str = None, language_code: str = 'ru') -> bool:
@@ -404,7 +559,10 @@ class Database:
                                      is_voice: bool = False,
                                      basic_translation: str = None,
                                      enhanced_translation: str = None,
-                                     alternatives: list = None) -> bool:
+                                     alternatives: list = None,
+                                     processing_time_ms: int = None,
+                                     status: str = 'success',
+                                     error_message: str = None) -> bool:
         """Add translation to history"""
         async with db_adapter.get_connection() as conn:
             # Check if history saving is enabled
@@ -424,11 +582,13 @@ class Database:
                     INSERT INTO translation_history (
                         user_id, source_text, source_language, translated_text,
                         basic_translation, enhanced_translation, alternatives,
-                        target_language, translation_style, is_voice
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        target_language, translation_style, is_voice,
+                        processing_time_ms, status, error_message
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', user_id, source_text, source_language, translated_text,
                      basic_translation, enhanced_translation, alternatives_json,
-                     target_language, style, is_voice)
+                     target_language, style, is_voice,
+                     processing_time_ms, status, error_message)
 
                 # Clean old history (keep only last MAX_HISTORY_ITEMS)
                 await conn.execute('''
@@ -604,6 +764,202 @@ class Database:
             except Exception as e:
                 print(f"Error updating subscription: {e}")
                 return False
+
+    async def block_user(self, user_id: int) -> bool:
+        """Block user from using the bot"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                await conn.execute('''
+                    UPDATE users
+                    SET is_blocked = TRUE, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                ''', user_id)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error blocking user {user_id}: {e}")
+                return False
+
+    async def unblock_user(self, user_id: int) -> bool:
+        """Unblock user"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                await conn.execute('''
+                    UPDATE users
+                    SET is_blocked = FALSE, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                ''', user_id)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error unblocking user {user_id}: {e}")
+                return False
+
+    async def is_user_blocked(self, user_id: int) -> bool:
+        """Check if user is blocked"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                row = await conn.fetchone('''
+                    SELECT is_blocked FROM users WHERE user_id = ?
+                ''', user_id)
+                return bool(row[0]) if row else False
+            except Exception as e:
+                print(f"Error checking if user {user_id} is blocked: {e}")
+                return False
+
+    # Feedback methods
+    async def add_feedback(self, user_id: int, message: str) -> bool:
+        """Add user feedback"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                await conn.execute('''
+                    INSERT INTO feedback (user_id, message, status)
+                    VALUES ($1, $2, 'new')
+                ''', user_id, message)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error adding feedback from user {user_id}: {e}")
+                return False
+
+    async def get_all_feedback(self, status: str = None, limit: int = 100):
+        """Get all feedback, optionally filtered by status"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                if status:
+                    rows = await conn.fetchall('''
+                        SELECT f.id, f.user_id, u.username, u.first_name, u.last_name,
+                               f.message, f.status, f.created_at, f.updated_at
+                        FROM feedback f
+                        LEFT JOIN users u ON f.user_id = u.user_id
+                        WHERE f.status = $1
+                        ORDER BY f.created_at DESC
+                        LIMIT $2
+                    ''', status, limit)
+                else:
+                    rows = await conn.fetchall('''
+                        SELECT f.id, f.user_id, u.username, u.first_name, u.last_name,
+                               f.message, f.status, f.created_at, f.updated_at
+                        FROM feedback f
+                        LEFT JOIN users u ON f.user_id = u.user_id
+                        ORDER BY f.created_at DESC
+                        LIMIT $1
+                    ''', limit)
+
+                feedback_list = []
+                for row in rows:
+                    feedback_list.append({
+                        'id': row[0],
+                        'user_id': row[1],
+                        'username': row[2] or 'Unknown',
+                        'user_name': f"{row[3] or ''} {row[4] or ''}".strip() or 'N/A',
+                        'message': row[5],
+                        'status': row[6],
+                        'created_at': row[7].isoformat() if row[7] else None,
+                        'updated_at': row[8].isoformat() if row[8] else None
+                    })
+                return feedback_list
+            except Exception as e:
+                print(f"Error getting feedback: {e}")
+                return []
+
+    async def update_feedback_status(self, feedback_id: int, status: str) -> bool:
+        """Update feedback status (new/reviewed/resolved)"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                await conn.execute('''
+                    UPDATE feedback
+                    SET status = $1, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2
+                ''', status, feedback_id)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error updating feedback {feedback_id}: {e}")
+                return False
+
+    async def get_feedback_count_by_status(self):
+        """Get count of feedback by status"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                rows = await conn.fetchall('''
+                    SELECT status, COUNT(*) as count
+                    FROM feedback
+                    GROUP BY status
+                ''')
+                return {row[0]: row[1] for row in rows}
+            except Exception as e:
+                print(f"Error getting feedback counts: {e}")
+                return {}
+
+    async def log_admin_action(self, admin_user_id: int, action: str, target_user_id: int = None, details: dict = None) -> bool:
+        """Log admin action"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                details_json = json.dumps(details) if details else None
+                await conn.execute('''
+                    INSERT INTO admin_actions (admin_user_id, action, target_user_id, details)
+                    VALUES ($1, $2, $3, $4)
+                ''', admin_user_id, action, target_user_id, details_json)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error logging admin action: {e}")
+                return False
+
+    async def get_admin_logs(self, admin_user_id: int = None, action: str = None, limit: int = 100):
+        """Get admin action logs with optional filters"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                conditions = []
+                params = []
+                param_count = 1
+
+                if admin_user_id:
+                    conditions.append(f"aa.admin_user_id = ${param_count}")
+                    params.append(admin_user_id)
+                    param_count += 1
+
+                if action:
+                    conditions.append(f"aa.action = ${param_count}")
+                    params.append(action)
+                    param_count += 1
+
+                where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+                params.append(limit)
+                query = f'''
+                    SELECT aa.id, aa.admin_user_id, u1.username as admin_username, u1.first_name as admin_first_name,
+                           aa.action, aa.target_user_id, u2.username as target_username, u2.first_name as target_first_name,
+                           aa.details, aa.created_at
+                    FROM admin_actions aa
+                    LEFT JOIN users u1 ON aa.admin_user_id = u1.user_id
+                    LEFT JOIN users u2 ON aa.target_user_id = u2.user_id
+                    {where_clause}
+                    ORDER BY aa.created_at DESC
+                    LIMIT ${param_count}
+                '''
+
+                rows = await conn.fetchall(query, *params)
+
+                logs = []
+                for row in rows:
+                    logs.append({
+                        'id': row[0],
+                        'admin_user_id': row[1],
+                        'admin_username': row[2] or 'Unknown',
+                        'admin_name': row[3] or 'N/A',
+                        'action': row[4],
+                        'target_user_id': row[5],
+                        'target_username': row[6] or 'Unknown' if row[5] else None,
+                        'target_name': row[7] or 'N/A' if row[5] else None,
+                        'details': json.loads(row[8]) if row[8] else {},
+                        'created_at': row[9].isoformat() if row[9] else None
+                    })
+                return logs
+            except Exception as e:
+                print(f"Error getting admin logs: {e}")
+                return []
 
 # Create global database instance
 db = Database()

@@ -18,60 +18,106 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .lang-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .lang-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .lang-btn.active {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <div id="app" class="min-h-screen">
         <!-- Header -->
-        <header class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-5 text-center shadow-lg">
-            <h1 class="text-2xl font-bold mb-2">🔐 LinguaBot Admin</h1>
-            <div id="userInfo" class="text-sm opacity-90"></div>
+        <header class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-5 shadow-lg">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex-1"></div>
+                <h1 class="text-2xl font-bold">🔐 LinguaBot Admin</h1>
+                <div class="flex-1 flex justify-end gap-2">
+                    <button class="lang-btn active" data-lang="ru" onclick="switchLanguage('ru')">RU</button>
+                    <button class="lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
+                </div>
+            </div>
+            <div id="userInfo" class="text-sm opacity-90 text-center"></div>
         </header>
 
         <!-- Navigation Tabs -->
         <nav class="flex bg-white border-b border-gray-200 sticky top-0 z-50">
-            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-blue-600 border-b-3 border-b-blue-600 transition-all active" data-tab="dashboard">📊 Dashboard</button>
-            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="users">👥 Users</button>
-            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="logs">📝 Logs</button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-blue-600 border-b-3 border-b-blue-600 transition-all active" data-tab="dashboard" data-i18n="nav.dashboard">📊 Dashboard</button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="users" data-i18n="nav.users">👥 Users</button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="logs" data-i18n="nav.logs">📝 Logs</button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="feedback" data-i18n="nav.feedback">💬 Feedback</button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="adminLogs" data-i18n="nav.adminLogs">🔒 Admin Logs</button>
         </nav>
 
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content p-4">
             <div class="grid grid-cols-2 gap-3 mb-5">
                 <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-5 rounded-xl shadow-lg">
-                    <div class="text-xs opacity-90 mb-2">Total Users</div>
+                    <div class="text-xs opacity-90 mb-2" data-i18n="dashboard.total_users">Total Users</div>
                     <div class="text-3xl font-bold" id="totalUsers">-</div>
                 </div>
                 <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-5 rounded-xl shadow-lg">
-                    <div class="text-xs opacity-90 mb-2">Premium Users</div>
+                    <div class="text-xs opacity-90 mb-2" data-i18n="dashboard.premium_users">Premium Users</div>
                     <div class="text-3xl font-bold" id="premiumUsers">-</div>
                 </div>
                 <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-5 rounded-xl shadow-lg">
-                    <div class="text-xs opacity-90 mb-2">Active Today</div>
+                    <div class="text-xs opacity-90 mb-2" data-i18n="dashboard.today_active">Active Today</div>
                     <div class="text-3xl font-bold" id="activeToday">-</div>
                 </div>
                 <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-5 rounded-xl shadow-lg">
-                    <div class="text-xs opacity-90 mb-2">Translations Today</div>
+                    <div class="text-xs opacity-90 mb-2" data-i18n="dashboard.translations_today">Translations Today</div>
                     <div class="text-3xl font-bold" id="translationsToday">-</div>
                 </div>
             </div>
 
             <div class="bg-white rounded-xl p-4 mb-4 shadow">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">📈 Daily Statistics (Last 7 Days)</h2>
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="dashboard.daily_stats">📈 Daily Statistics (Last 7 Days)</h2>
                 <div id="dailyStats" class="flex flex-col gap-2"></div>
             </div>
 
             <div class="bg-white rounded-xl p-4 mb-4 shadow">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">🌍 Language Statistics</h2>
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="dashboard.language_stats">🌍 Language Statistics</h2>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="bg-gray-50 p-3 rounded-lg">
-                        <h3 class="text-sm font-medium text-gray-600 mb-3">Source Languages</h3>
+                        <h3 class="text-sm font-medium text-gray-600 mb-3" data-i18n="dashboard.source_languages">Source Languages</h3>
                         <div id="sourceLangs"></div>
                     </div>
                     <div class="bg-gray-50 p-3 rounded-lg">
-                        <h3 class="text-sm font-medium text-gray-600 mb-3">Target Languages</h3>
+                        <h3 class="text-sm font-medium text-gray-600 mb-3" data-i18n="dashboard.target_languages">Target Languages</h3>
                         <div id="targetLangs"></div>
                     </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-4 mb-4 shadow">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="dashboard.performance">⚡ Performance Metrics</h2>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-4 rounded-xl shadow">
+                        <div class="text-xs opacity-90 mb-1" data-i18n="dashboard.avg_processing">Avg Processing Time</div>
+                        <div class="text-2xl font-bold" id="avgProcessingTime">-</div>
+                        <div class="text-xs opacity-80 mt-1" id="avgProcessingDetails" data-i18n="common.loading">Loading...</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-4 rounded-xl shadow">
+                        <div class="text-xs opacity-90 mb-1" data-i18n="dashboard.success_rate">Success Rate</div>
+                        <div class="text-2xl font-bold" id="successRate">-</div>
+                        <div class="text-xs opacity-80 mt-1" id="successDetails" data-i18n="common.loading">Loading...</div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-lg">
+                    <h3 class="text-sm font-medium text-gray-600 mb-3" data-i18n="dashboard.errors_7days">Errors (Last 7 Days)</h3>
+                    <div id="errorsByDay" class="flex flex-col gap-2"></div>
                 </div>
             </div>
         </div>
@@ -80,17 +126,17 @@
         <div id="users" class="tab-content hidden p-4">
             <div class="bg-white rounded-xl p-4 mb-4 shadow">
                 <div class="flex gap-3 mb-4 flex-wrap">
-                    <input type="text" id="userSearch" placeholder="Search users..." class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                    <input type="text" id="userSearch" data-i18n="users.search" placeholder="Search users..." class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
                     <label class="flex items-center gap-2 text-sm text-gray-800 whitespace-nowrap">
                         <input type="checkbox" id="premiumFilter" class="rounded">
-                        Premium only
+                        <span data-i18n="users.filter_premium">Premium only</span>
                     </label>
                 </div>
                 <div id="usersList" class="flex flex-col gap-2"></div>
                 <div class="flex justify-between items-center mt-4">
-                    <button id="prevPage" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200 transition">← Previous</button>
+                    <button id="prevPage" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200 transition" data-i18n="pagination.prev">← Previous</button>
                     <span id="pageInfo" class="text-sm text-gray-800">Page 1</span>
-                    <button id="nextPage" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200 transition">Next →</button>
+                    <button id="nextPage" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200 transition" data-i18n="pagination.next">Next →</button>
                 </div>
             </div>
         </div>
@@ -98,12 +144,13 @@
         <!-- Logs Tab -->
         <div id="logs" class="tab-content hidden p-4">
             <div class="bg-white rounded-xl p-4 mb-4 shadow">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">📝 Translation Logs</h2>
-                <div class="flex gap-3 mb-4">
-                    <select id="logFilter" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
-                        <option value="">All translations</option>
-                        <option value="voice">Voice only</option>
-                        <option value="text">Text only</option>
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="logs.title">📝 Translation Logs</h2>
+                <div class="flex gap-3 mb-4 flex-wrap">
+                    <input type="text" id="logSearch" data-i18n="logs.search" placeholder="Search by username or text..." class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                    <select id="logFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                        <option value="" data-i18n="logs.filter_all">All translations</option>
+                        <option value="voice" data-i18n="logs.filter_voice">Voice only</option>
+                        <option value="text" data-i18n="logs.filter_text">Text only</option>
                     </select>
                 </div>
                 <div id="translationLogs" class="flex flex-col gap-2 max-h-[500px] overflow-y-auto"></div>
@@ -111,8 +158,61 @@
 
             <div class="bg-white rounded-xl p-4 mb-4 shadow">
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">🐛 System Logs (Last 50 lines)</h2>
-                <button id="refreshLogs" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition">Refresh</button>
+                <button id="refreshLogs" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition" data-i18n="logs.refresh">Refresh</button>
                 <div id="systemLogs" class="bg-gray-900 text-gray-300 p-3 rounded-lg font-mono text-xs max-h-96 overflow-y-auto whitespace-pre-wrap break-all mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Feedback Tab -->
+        <div id="feedback" class="tab-content hidden p-4">
+            <div class="bg-white rounded-xl p-4 mb-4 shadow">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="feedback.title">💬 User Feedback</h2>
+                <div class="flex gap-3 mb-4 flex-wrap">
+                    <select id="feedbackStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                        <option value="" data-i18n="feedback.filter_all">All feedback</option>
+                        <option value="new" data-i18n="feedback.filter_new">New only</option>
+                        <option value="reviewed" data-i18n="feedback.filter_reviewed">Reviewed</option>
+                        <option value="resolved" data-i18n="feedback.filter_resolved">Resolved</option>
+                    </select>
+                    <button id="refreshFeedback" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition" data-i18n="feedback.refresh">Refresh</button>
+                </div>
+                <div id="feedbackList" class="flex flex-col gap-3 max-h-[600px] overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Admin Logs Tab -->
+        <div id="adminLogs" class="tab-content hidden p-4">
+            <div class="bg-white rounded-xl p-4 mb-4 shadow">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="adminLogs.title">🔒 Admin Action Logs</h2>
+                <div class="flex gap-3 mb-4 flex-wrap">
+                    <select id="adminLogsAdminFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                        <option value="" data-i18n="adminLogs.filter_all_admins">All admins</option>
+                    </select>
+                    <select id="adminLogsActionFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800">
+                        <option value="" data-i18n="adminLogs.filter_all_actions">All actions</option>
+                        <option value="grant_premium">Grant Premium</option>
+                        <option value="revoke_premium">Revoke Premium</option>
+                        <option value="ban_user">Ban User</option>
+                        <option value="unban_user">Unban User</option>
+                        <option value="update_feedback">Update Feedback</option>
+                        <option value="view_history">View History</option>
+                    </select>
+                    <button id="refreshAdminLogs" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition" data-i18n="adminLogs.refresh">Refresh</button>
+                </div>
+                <div id="adminLogsList" class="flex flex-col gap-3 max-h-[600px] overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- User History Modal -->
+        <div id="userHistoryModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[999]">
+            <div class="bg-white rounded-xl p-5 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-900">📜 Translation History</h2>
+                    <button onclick="closeHistoryModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                </div>
+                <div id="historyContent" class="space-y-3">
+                    <!-- History items will be inserted here -->
+                </div>
             </div>
         </div>
 

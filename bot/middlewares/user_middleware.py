@@ -30,6 +30,18 @@ class UserMiddleware(BaseMiddleware):
                     last_name=user.last_name,
                     language_code=user.language_code or 'ru'
                 )
+
+                # Check if user is blocked
+                is_blocked = await db.is_user_blocked(user.id)
+                if is_blocked:
+                    # Send blocked message and don't process the update
+                    from aiogram.types import Message
+                    if isinstance(event, Message):
+                        await event.answer(
+                            "🚫 Ваш аккаунт заблокирован.\n\n"
+                            "Если вы считаете, что это ошибка, обратитесь в поддержку."
+                        )
+                    return  # Don't call the handler
             except Exception as e:
                 logger.error(f"User middleware error: {e}")
 

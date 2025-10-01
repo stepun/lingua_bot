@@ -1,14 +1,7 @@
-"""FastAPI Admin Panel Application"""
+"""aiohttp Admin Panel Application"""
 
-from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import json
-
-from admin_app.auth import validate_telegram_webapp_data, is_admin
-from admin_app.api import stats, users, logs
 
 
 def setup_admin_routes(aiohttp_app):
@@ -163,7 +156,8 @@ def setup_admin_routes(aiohttp_app):
                                     AND s.status = 'active'
                                     AND s.expires_at > CURRENT_TIMESTAMP
                                 ) THEN 1 ELSE 0
-                              END as is_premium
+                              END as is_premium,
+                              u.is_blocked
                        FROM users u
                        {where_clause}
                        ORDER BY u.created_at DESC
@@ -180,7 +174,8 @@ def setup_admin_routes(aiohttp_app):
                         "name": f"{row[2] or ''} {row[3] or ''}".strip() or "N/A",
                         "is_premium": bool(row[6]),
                         "total_translations": row[4] or 0,
-                        "created_at": str(row[5]) if row[5] else None
+                        "created_at": str(row[5]) if row[5] else None,
+                        "is_blocked": bool(row[7]) if row[7] is not None else False
                     })
 
                 # Get total count with same filters
@@ -219,13 +214,27 @@ def setup_admin_routes(aiohttp_app):
             page = int(request.query.get('page', 1))
             per_page = int(request.query.get('per_page', 20))
             filter_type = request.query.get('filter', 'all')
+            search = request.query.get('search', '').strip()
 
-            # Build WHERE clause based on filter
-            where_clause = ""
+            # Build WHERE clause based on filter and search
+            where_conditions = []
+            params = []
+
             if filter_type == "voice":
-                where_clause = "WHERE is_voice = 1"
+                where_conditions.append("is_voice = TRUE")
             elif filter_type == "text":
-                where_clause = "WHERE is_voice = 0"
+                where_conditions.append("is_voice = FALSE")
+
+            if search:
+                # Search in username, source_text, and translation
+                where_conditions.append("(u.username ILIKE ? OR th.source_text ILIKE ? OR th.basic_translation ILIKE ?)")
+                search_pattern = f"%{search}%"
+                params.extend([search_pattern, search_pattern, search_pattern])
+
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+
+            # Add pagination params
+            params.extend([per_page, (page-1)*per_page])
 
             async with db_adapter.get_connection() as conn:
                 rows = await conn.fetchall(
@@ -236,7 +245,7 @@ def setup_admin_routes(aiohttp_app):
                        {where_clause}
                        ORDER BY th.created_at DESC
                        LIMIT ? OFFSET ?""",
-                    per_page, (page-1)*per_page
+                    *params
                 )
 
                 logs = []
@@ -253,10 +262,12 @@ def setup_admin_routes(aiohttp_app):
                         "is_voice": bool(row[8])
                     })
 
-                # Get total count
-                total_row = await conn.fetchone(
-                    f"SELECT COUNT(*) FROM translation_history {where_clause}"
-                )
+                # Get total count (reuse where_clause and search params)
+                count_params = params[:-2]  # Exclude LIMIT and OFFSET params
+                count_query = f"""SELECT COUNT(*) FROM translation_history th
+                                  LEFT JOIN users u ON th.user_id = u.user_id
+                                  {where_clause}"""
+                total_row = await conn.fetchone(count_query, *count_params)
                 total = total_row[0] if total_row else 0
 
             return web.json_response({
@@ -308,115 +319,271 @@ def setup_admin_routes(aiohttp_app):
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
+    async def get_performance_stats(request):
+        """Get performance metrics for translations"""
+        try:
+            check_admin(request)
+
+            from bot.db_adapter import db_adapter
+            from datetime import datetime, timedelta
+
+            async with db_adapter.get_connection() as conn:
+                # Average processing time (overall and by type)
+                avg_time_row = await conn.fetchone(
+                    """SELECT
+                           AVG(processing_time_ms) as avg_overall,
+                           AVG(CASE WHEN is_voice = TRUE THEN processing_time_ms END) as avg_voice,
+                           AVG(CASE WHEN is_voice = FALSE THEN processing_time_ms END) as avg_text
+                       FROM translation_history
+                       WHERE processing_time_ms IS NOT NULL"""
+                )
+
+                avg_overall = int(avg_time_row[0]) if avg_time_row and avg_time_row[0] else 0
+                avg_voice = int(avg_time_row[1]) if avg_time_row and avg_time_row[1] else 0
+                avg_text = int(avg_time_row[2]) if avg_time_row and avg_time_row[2] else 0
+
+                # Success rate
+                status_row = await conn.fetchone(
+                    """SELECT
+                           COUNT(*) as total,
+                           COUNT(CASE WHEN status = 'success' THEN 1 END) as success_count
+                       FROM translation_history"""
+                )
+
+                total_count = status_row[0] if status_row else 0
+                success_count = status_row[1] if status_row else 0
+                success_rate = round((success_count / total_count * 100), 2) if total_count > 0 else 100.0
+
+                # Error breakdown by day (last 7 days)
+                seven_days_ago = datetime.now() - timedelta(days=7)
+                error_rows = await conn.fetchall(
+                    """SELECT
+                           DATE(created_at) as date,
+                           COUNT(*) as error_count
+                       FROM translation_history
+                       WHERE status != 'success'
+                         AND created_at >= ?
+                       GROUP BY DATE(created_at)
+                       ORDER BY date DESC""",
+                    seven_days_ago
+                )
+
+                errors_by_day = [
+                    {
+                        "date": str(row[0]) if row[0] else None,
+                        "count": row[1]
+                    }
+                    for row in error_rows
+                ]
+
+                # Today's stats
+                today = datetime.now().date()
+                today_row = await conn.fetchone(
+                    """SELECT
+                           AVG(processing_time_ms) as avg_time,
+                           COUNT(*) as total,
+                           COUNT(CASE WHEN status = 'success' THEN 1 END) as success_count
+                       FROM translation_history
+                       WHERE DATE(created_at) = ?
+                         AND processing_time_ms IS NOT NULL""",
+                    today
+                )
+
+                today_avg_time = int(today_row[0]) if today_row and today_row[0] else 0
+                today_total = today_row[1] if today_row else 0
+                today_success = today_row[2] if today_row else 0
+                today_success_rate = round((today_success / today_total * 100), 2) if today_total > 0 else 100.0
+
+            return web.json_response({
+                "average_processing_time": {
+                    "overall": avg_overall,
+                    "voice": avg_voice,
+                    "text": avg_text
+                },
+                "success_rate": success_rate,
+                "total_translations": total_count,
+                "successful_translations": success_count,
+                "errors_by_day": errors_by_day,
+                "today": {
+                    "average_time": today_avg_time,
+                    "total": today_total,
+                    "success_rate": today_success_rate
+                }
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def block_user_endpoint(request):
+        """Block user"""
+        try:
+            check_admin(request)
+
+            from bot.database import db
+
+            user_id = int(request.match_info['user_id'])
+            success = await db.block_user(user_id)
+
+            if success:
+                return web.json_response({"success": True, "message": "User blocked successfully"})
+            else:
+                return web.json_response({"error": "Failed to block user"}, status=500)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def unblock_user_endpoint(request):
+        """Unblock user"""
+        try:
+            check_admin(request)
+
+            from bot.database import db
+
+            user_id = int(request.match_info['user_id'])
+            success = await db.unblock_user(user_id)
+
+            if success:
+                return web.json_response({"success": True, "message": "User unblocked successfully"})
+            else:
+                return web.json_response({"error": "Failed to unblock user"}, status=500)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def get_user_history(request):
+        """Get translation history for specific user"""
+        try:
+            check_admin(request)
+
+            from bot.database import db
+            from bot.db_adapter import db_adapter
+
+            user_id = int(request.match_info['user_id'])
+            limit = int(request.query.get('limit', 10))
+
+            async with db_adapter.get_connection() as conn:
+                rows = await conn.fetchall(
+                    """SELECT th.id, th.source_language, th.target_language,
+                              th.source_text, th.basic_translation, th.created_at, th.is_voice
+                       FROM translation_history th
+                       WHERE th.user_id = ?
+                       ORDER BY th.created_at DESC
+                       LIMIT ?""",
+                    user_id, limit
+                )
+
+                history = []
+                for row in rows:
+                    history.append({
+                        "id": row[0],
+                        "source_lang": row[1] or "auto",
+                        "target_lang": row[2] or "en",
+                        "source_text": row[3][:100] if row[3] else "",  # First 100 chars
+                        "translation": row[4][:100] if row[4] else "",
+                        "created_at": str(row[5]) if row[5] else None,
+                        "is_voice": bool(row[6])
+                    })
+
+            return web.json_response({
+                "user_id": user_id,
+                "history": history,
+                "total": len(history)
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    # Feedback endpoints
+    async def get_feedback(request):
+        """Get all feedback with optional status filter"""
+        try:
+            from bot.database import db
+
+            status = request.query.get('status', None)
+            limit = int(request.query.get('limit', 100))
+
+            feedback_list = await db.get_all_feedback(status=status, limit=limit)
+
+            return web.json_response({
+                "feedback": feedback_list,
+                "total": len(feedback_list)
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def update_feedback_status(request):
+        """Update feedback status"""
+        try:
+            from bot.database import db
+
+            feedback_id = int(request.match_info['feedback_id'])
+            data = await request.json()
+            new_status = data.get('status')
+
+            if new_status not in ['new', 'reviewed', 'resolved']:
+                return web.json_response({"error": "Invalid status"}, status=400)
+
+            success = await db.update_feedback_status(feedback_id, new_status)
+
+            if success:
+                return web.json_response({"success": True, "message": "Status updated"})
+            else:
+                return web.json_response({"error": "Failed to update status"}, status=500)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def get_admin_logs_endpoint(request):
+        """Get admin action logs"""
+        try:
+            check_admin(request)  # Check admin access
+
+            from bot.database import db
+
+            # Get query parameters
+            admin_user_id = request.query.get('admin_user_id')
+            action = request.query.get('action')
+            limit = int(request.query.get('limit', 100))
+
+            # Convert admin_user_id to int if provided
+            if admin_user_id:
+                admin_user_id = int(admin_user_id)
+
+            # Get logs from database
+            logs = await db.get_admin_logs(
+                admin_user_id=admin_user_id,
+                action=action,
+                limit=limit
+            )
+
+            return web.json_response({
+                "logs": logs,
+                "total": len(logs)
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
     # API routes
     aiohttp_app.router.add_get('/api/stats/', get_stats)
     aiohttp_app.router.add_get('/api/stats/daily', get_daily_stats)
     aiohttp_app.router.add_get('/api/stats/languages', get_language_stats)
+    aiohttp_app.router.add_get('/api/stats/performance', get_performance_stats)
     aiohttp_app.router.add_get('/api/users/', get_users)
+    aiohttp_app.router.add_get('/api/users/{user_id}/history', get_user_history)
+    aiohttp_app.router.add_post('/api/users/{user_id}/block', block_user_endpoint)
+    aiohttp_app.router.add_post('/api/users/{user_id}/unblock', unblock_user_endpoint)
     aiohttp_app.router.add_get('/api/logs/translations', get_translation_logs)
+    aiohttp_app.router.add_get('/api/feedback', get_feedback)
+    aiohttp_app.router.add_post('/api/feedback/{feedback_id}/status', update_feedback_status)
+    aiohttp_app.router.add_get('/api/admin-logs', get_admin_logs_endpoint)
 
     return aiohttp_app
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="LinguaBot Admin Panel",
-    description="Admin panel for LinguaBot Telegram translator",
-    version="1.0.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Include API routers
-app.include_router(stats.router)
-app.include_router(users.router)
-app.include_router(logs.router)
-
-# Mount static files
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
-
-# Authentication dependency
-async def verify_admin(request: Request):
-    """Verify that request is from authorized admin"""
-    # Get authorization header
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header or not auth_header.startswith("tma "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    # Extract init data
-    init_data = auth_header[4:]  # Remove "tma " prefix
-
-    # Validate Telegram data
-    validated_data = validate_telegram_webapp_data(init_data)
-
-    if not validated_data:
-        raise HTTPException(status_code=401, detail="Invalid Telegram data")
-
-    # Extract user data
-    user_data = json.loads(validated_data.get("user", "{}"))
-    user_id = user_data.get("id")
-
-    if not user_id or not is_admin(user_id):
-        raise HTTPException(status_code=403, detail="Access denied: not an admin")
-
-    return user_id
-
-
-@app.get("/")
-async def root():
-    """Root endpoint - serves the mini-app HTML"""
-    html_file = Path(__file__).parent / "static" / "index.html"
-
-    if not html_file.exists():
-        return HTMLResponse("""
-        <html>
-            <head><title>LinguaBot Admin</title></head>
-            <body>
-                <h1>Admin Panel</h1>
-                <p>Frontend not yet deployed. API is available at /docs</p>
-            </body>
-        </html>
-        """)
-
-    with open(html_file, 'r', encoding='utf-8') as f:
-        return HTMLResponse(content=f.read())
-
-
-@app.get("/health")
-async def health():
-    """Health check endpoint"""
-    return {"status": "ok", "service": "linguabot-admin"}
-
-
-@app.get("/api/me")
-async def get_current_user(user_id: int = Depends(verify_admin)):
-    """Get current authenticated admin user info"""
-    from bot.database import Database
-    db = Database()
-
-    user = await db.get_user(user_id)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "user_id": user_id,
-        "username": user.get("username"),
-        "first_name": user.get("first_name"),
-        "is_admin": True
-    }
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8081)
