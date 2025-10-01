@@ -56,6 +56,8 @@ psql $DATABASE_URL -f migrations/XXX_description.sql
 - **001_add_is_blocked.sql**: User blocking feature (Task 2.1)
 - **002_add_performance_metrics.sql**: Performance tracking (Task 2.4)
 - **003_remove_premium_fields.sql**: Remove redundant premium fields from users table
+- **004_reset_migration_003.sql**: Reset migration 003 to allow re-application
+- **005_add_test_field.sql**: Add test field to users table for testing migration system
 
 ## Notes
 
