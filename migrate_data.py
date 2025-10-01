@@ -9,7 +9,8 @@ from datetime import datetime
 
 # Database paths
 SQLITE_DB = "/tmp/beget_bot.db"
-POSTGRES_URL = os.getenv("DATABASE_PUBLIC_URL", "postgresql://postgres:NtLFItrylcyGPGHIqllCxepVRNTSkHYG@hopper.proxy.rlwy.net:52905/railway")
+# Use DATABASE_URL for local, or DATABASE_PUBLIC_URL for Railway
+POSTGRES_URL = os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL", "postgresql://postgres:NtLFItrylcyGPGHIqllCxepVRNTSkHYG@hopper.proxy.rlwy.net:52905/railway")
 
 def parse_datetime(dt_str):
     """Parse datetime string from SQLite"""
