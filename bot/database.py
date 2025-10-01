@@ -292,6 +292,9 @@ class Database:
         # Apply migrations after initial schema setup
         await self.apply_migrations()
 
+        # Auto-repair schema if migrations were marked as applied but columns are missing
+        await self.verify_and_repair_schema()
+
     async def apply_migrations(self):
         """Apply pending database migrations from migrations/ folder"""
         import os
@@ -388,6 +391,58 @@ class Database:
                     # Do NOT continue - stop on first error to prevent cascading failures
                     # In production, you want to know immediately if a migration failed
                     raise RuntimeError(f"Migration {version} failed: {e}")
+
+    async def verify_and_repair_schema(self):
+        """
+        Verify schema integrity and repair if migrations were marked as applied
+        but columns are missing (due to previous transaction issues)
+        """
+        print("[SCHEMA_REPAIR] Verifying schema integrity...")
+
+        async with db_adapter.get_connection() as conn:
+            repairs_made = []
+
+            # Check 001_add_is_blocked.sql - users.is_blocked
+            try:
+                if db_adapter.is_postgres:
+                    row = await conn.fetchone("""
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_name = 'users' AND column_name = 'is_blocked'
+                    """)
+                    if not row:
+                        print("[SCHEMA_REPAIR] ⚠️  Column users.is_blocked missing, repairing...")
+                        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE")
+                        repairs_made.append("users.is_blocked")
+                        print("[SCHEMA_REPAIR] ✅ Repaired users.is_blocked")
+            except Exception as e:
+                print(f"[SCHEMA_REPAIR] Error checking users.is_blocked: {e}")
+
+            # Check 002_add_performance_metrics.sql - translation_history columns
+            try:
+                if db_adapter.is_postgres:
+                    row = await conn.fetchone("""
+                        SELECT COUNT(*) as cnt
+                        FROM information_schema.columns
+                        WHERE table_name = 'translation_history'
+                        AND column_name IN ('processing_time_ms', 'status', 'error_message')
+                    """)
+                    missing_count = 3 - (row['cnt'] if row else 0)
+                    if missing_count > 0:
+                        print(f"[SCHEMA_REPAIR] ⚠️  Missing {missing_count} translation_history columns, repairing...")
+                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS processing_time_ms INTEGER")
+                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'success'")
+                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS error_message TEXT")
+                        repairs_made.append("translation_history.performance_metrics")
+                        print("[SCHEMA_REPAIR] ✅ Repaired translation_history performance columns")
+            except Exception as e:
+                print(f"[SCHEMA_REPAIR] Error checking translation_history: {e}")
+
+            if repairs_made:
+                print(f"[SCHEMA_REPAIR] ✅ Repairs completed: {', '.join(repairs_made)}")
+                await conn.commit()
+            else:
+                print("[SCHEMA_REPAIR] ✅ Schema is healthy, no repairs needed")
 
     async def add_user(self, user_id: int, username: str = None, first_name: str = None,
                       last_name: str = None, language_code: str = 'ru') -> bool:
