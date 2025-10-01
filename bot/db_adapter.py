@@ -149,6 +149,10 @@ class PostgreSQLConnection:
         """Commit transaction (no-op for PostgreSQL, autocommit by default)"""
         pass
 
+    def transaction(self):
+        """Return transaction context manager from underlying asyncpg connection"""
+        return self.conn.transaction()
+
     def _convert_placeholders(self, query: str) -> str:
         """Convert ? placeholders to $1, $2, etc"""
         result = []
