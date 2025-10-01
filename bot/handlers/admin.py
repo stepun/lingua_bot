@@ -53,15 +53,22 @@ async def admin_panel(message: Message):
 @router.message(Command("admin_panel"))
 async def open_admin_webapp(message: Message):
     """Open admin mini-app"""
-    logger.info(f"Admin panel command from user {message.from_user.id}, ADMIN_IDS: {config.ADMIN_IDS}")
+    user_id = message.from_user.id
+    logger.info(f"Admin panel command from user {user_id}, ADMIN_IDS: {config.ADMIN_IDS}")
 
-    if not is_admin(message.from_user.id):
+    # Check admin rights
+    if not is_admin(user_id):
+        logger.warning(f"Access denied for user {user_id}")
         await message.answer(
             f"❌ У вас нет прав администратора\n\n"
-            f"Ваш ID: `{message.from_user.id}`\n"
-            f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS"
+            f"Ваш ID: `{user_id}`\n"
+            f"Текущие админы: `{config.ADMIN_IDS}`\n\n"
+            f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS",
+            parse_mode='Markdown'
         )
         return
+
+    logger.info(f"Admin access granted for user {user_id}")
 
     # Get the admin panel URL from config or use default
     admin_url = os.getenv("ADMIN_PANEL_URL", "http://localhost:8081")
