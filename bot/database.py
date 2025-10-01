@@ -346,20 +346,17 @@ class Database:
                     # Execute each statement (split by semicolons, excluding comments)
                     statements = [s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]
 
-                    # Use explicit transaction (asyncpg requires this for atomic DDL+DML)
-                    async with conn.transaction():
-                        # Execute all statements in the migration
-                        for statement in statements:
-                            if statement:
-                                print(f"[MIGRATIONS]   Executing: {statement[:80]}...")
-                                await conn.execute(statement)
+                    # Execute all statements in the migration (PostgreSQL autocommit mode)
+                    for statement in statements:
+                        if statement:
+                            print(f"[MIGRATIONS]   Executing: {statement[:80]}...")
+                            await conn.execute(statement)
 
-                        # Mark migration as applied (still in same transaction)
-                        await conn.execute(
-                            'INSERT INTO schema_migrations (version) VALUES ($1)',
-                            version
-                        )
-                        # Transaction commits automatically on exit
+                    # Mark migration as applied
+                    await conn.execute(
+                        'INSERT INTO schema_migrations (version) VALUES ($1)',
+                        version
+                    )
 
                     print(f"[MIGRATIONS] ✅ Applied {version}")
 
@@ -371,6 +368,8 @@ class Database:
                     if 'duplicate key' in error_str or 'unique constraint' in error_str:
                         print(f"[MIGRATIONS] ⚠️  Migration {version} already recorded but may have failed previously")
                         print(f"[MIGRATIONS] ⚠️  Please verify schema manually or run fix script")
+                        # Skip this migration and continue
+                        continue
 
                     # Do NOT continue - stop on first error to prevent cascading failures
                     raise RuntimeError(f"Migration {version} failed: {e}")
