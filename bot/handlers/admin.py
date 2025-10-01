@@ -16,6 +16,12 @@ router = Router()
 db = Database()
 logger = logging.getLogger(__name__)
 
+# Test handler - should be registered first
+@router.message(Command("test_admin"))
+async def test_admin_handler(message: Message):
+    """Test handler to check if router works"""
+    await message.answer(f"✅ Test OK! Your ID: {message.from_user.id}")
+
 class AdminStates(StatesGroup):
     waiting_yookassa_shop_id = State()
     waiting_yookassa_secret_key = State()
