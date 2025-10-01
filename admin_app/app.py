@@ -74,7 +74,7 @@ def setup_admin_routes(aiohttp_app):
 
             total_users = await db.get_user_count()
             premium_users = await db.get_premium_user_count()
-            today_stats = await db.get_statistics(datetime.now())
+            today_stats = await db.get_statistics(datetime.now().date())
 
             return web.json_response({
                 "total_users": total_users,
@@ -97,7 +97,7 @@ def setup_admin_routes(aiohttp_app):
             stats = []
 
             for i in range(days):
-                date = datetime.now() - timedelta(days=i)
+                date = (datetime.now() - timedelta(days=i)).date()
                 day_stats = await db.get_statistics(date)
                 stats.append({
                     "date": date.strftime("%Y-%m-%d"),
