@@ -29,6 +29,8 @@ This directory contains versioned SQL migrations for the LinguaBot database sche
 2. **Auto-apply**: Migrations run automatically on bot startup via `Database.apply_migrations()`
 3. **Idempotent**: Use `IF NOT EXISTS` / `IF EXISTS` to make migrations safe to re-run
 4. **Order**: Migrations execute in alphabetical/numerical order
+5. **Atomic**: Each migration runs in a transaction - either ALL statements succeed or ALL rollback
+6. **Fail-fast**: If a migration fails, the bot stops startup and reports the error
 
 ## Creating a New Migration
 
@@ -60,3 +62,53 @@ psql $DATABASE_URL -f migrations/XXX_description.sql
 - ⚠️ Never change version numbers of applied migrations
 - ✅ Always use `ADD COLUMN IF NOT EXISTS` for safety
 - ✅ Always test migrations on dev environment first
+
+## Troubleshooting
+
+### Migration Failed with "duplicate key" Error
+
+**Problem**: Migration marked as applied in `schema_migrations`, but schema changes didn't apply.
+
+**Symptoms**:
+```
+[MIGRATIONS] ❌ Failed to apply: duplicate key value violates unique constraint "schema_migrations_pkey"
+asyncpg.exceptions.UndefinedColumnError: column does not exist
+```
+
+**Solution**:
+1. Create fix script to manually apply the migration
+2. Delete the failed entry from `schema_migrations`
+3. Re-run the migration
+
+**Example fix script**:
+```sql
+-- Delete failed migration record
+DELETE FROM schema_migrations WHERE version = 'XXX_migration_name.sql';
+
+-- Manually apply the migration
+ALTER TABLE users ADD COLUMN IF NOT EXISTS new_column TEXT;
+
+-- Re-insert migration record
+INSERT INTO schema_migrations (version) VALUES ('XXX_migration_name.sql');
+```
+
+### Best Practices for Future Migrations
+
+1. **Always use IF NOT EXISTS / IF EXISTS**
+   - Makes migrations idempotent
+   - Safe to re-run multiple times
+
+2. **Test locally first**
+   ```bash
+   # Test on local Docker
+   docker compose -f docker-compose.dev.yml restart linguabot
+   # Check logs for [MIGRATIONS] messages
+   ```
+
+3. **One logical change per migration**
+   - Don't mix unrelated schema changes
+   - Easier to rollback if needed
+
+4. **Document breaking changes**
+   - Add comment in migration file explaining impact
+   - Update CLAUDE.md if affects development workflow

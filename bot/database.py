@@ -314,8 +314,8 @@ class Database:
             applied = set()
             try:
                 if db_adapter.is_postgres:
-                    # PostgreSQL: Use raw execute + fetchall
-                    rows = await conn.fetch('SELECT version FROM schema_migrations')
+                    # PostgreSQL: Use fetchall
+                    rows = await conn.fetchall('SELECT version FROM schema_migrations')
                     applied = {row['version'] for row in rows}
                 else:
                     # SQLite: Use fetchall with empty tuple
@@ -334,6 +334,7 @@ class Database:
 
                 print(f"[MIGRATIONS] Applying {version}...")
 
+                migration_success = False
                 try:
                     # Read migration SQL
                     with open(migration_file, 'r', encoding='utf-8') as f:
@@ -342,11 +343,16 @@ class Database:
                     # Execute each statement (split by semicolons, excluding comments)
                     statements = [s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]
 
+                    # BEGIN TRANSACTION (PostgreSQL auto-starts, SQLite needs explicit)
+                    if not db_adapter.is_postgres:
+                        await conn.execute("BEGIN")
+
+                    # Execute all statements in the migration
                     for statement in statements:
                         if statement:
                             await conn.execute(statement)
 
-                    # Mark migration as applied
+                    # Mark migration as applied (still in same transaction)
                     if db_adapter.is_postgres:
                         await conn.execute(
                             'INSERT INTO schema_migrations (version) VALUES ($1)',
@@ -358,13 +364,30 @@ class Database:
                             (version,)
                         )
 
+                    # COMMIT - both DDL and INSERT succeed together
                     await conn.commit()
+                    migration_success = True
                     print(f"[MIGRATIONS] ✅ Applied {version}")
 
                 except Exception as e:
                     print(f"[MIGRATIONS] ❌ Failed to apply {version}: {e}")
-                    # Continue with next migration even if one fails
-                    continue
+
+                    # ROLLBACK on error - neither DDL nor INSERT will be saved
+                    try:
+                        if not db_adapter.is_postgres:
+                            await conn.execute("ROLLBACK")
+                    except:
+                        pass
+
+                    # Check if this is a "duplicate key" error (migration already recorded but failed)
+                    error_str = str(e).lower()
+                    if 'duplicate key' in error_str or 'unique constraint' in error_str:
+                        print(f"[MIGRATIONS] ⚠️  Migration {version} already recorded but may have failed previously")
+                        print(f"[MIGRATIONS] ⚠️  Please verify schema manually or run fix script")
+
+                    # Do NOT continue - stop on first error to prevent cascading failures
+                    # In production, you want to know immediately if a migration failed
+                    raise RuntimeError(f"Migration {version} failed: {e}")
 
     async def add_user(self, user_id: int, username: str = None, first_name: str = None,
                       last_name: str = None, language_code: str = 'ru') -> bool:
