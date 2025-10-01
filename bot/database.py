@@ -301,12 +301,16 @@ class Database:
         import glob
 
         migrations_dir = Path(__file__).parent.parent / 'migrations'
+        print(f"[MIGRATIONS] Looking for migrations in: {migrations_dir}")
+        print(f"[MIGRATIONS] Directory exists: {migrations_dir.exists()}")
+
         if not migrations_dir.exists():
             print("[MIGRATIONS] No migrations directory found, skipping...")
             return
 
         # Get all .sql migration files sorted by version
         migration_files = sorted(glob.glob(str(migrations_dir / '*.sql')))
+        print(f"[MIGRATIONS] Found {len(migration_files)} migration files: {[os.path.basename(f) for f in migration_files]}")
 
         if not migration_files:
             print("[MIGRATIONS] No migration files found")
@@ -324,8 +328,10 @@ class Database:
                     # SQLite: Use fetchall with empty tuple
                     rows = await conn.fetchall('SELECT version FROM schema_migrations', ())
                     applied = {row[0] for row in rows}
+                print(f"[MIGRATIONS] Already applied: {sorted(applied)}")
             except Exception as e:
                 # Table might not exist yet on first run, that's OK
+                print(f"[MIGRATIONS] Could not read schema_migrations table (might not exist yet): {e}")
                 pass
 
             # Apply pending migrations
@@ -333,6 +339,7 @@ class Database:
                 version = os.path.basename(migration_file)
 
                 if version in applied:
+                    print(f"[MIGRATIONS] ✓ Skipping {version} (already applied)")
                     continue
 
                 print(f"[MIGRATIONS] Applying {version}...")
