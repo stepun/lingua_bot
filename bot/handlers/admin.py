@@ -87,6 +87,9 @@ async def open_admin_webapp(message: Message):
     if not admin_url.endswith('/admin') and not admin_url.endswith('/admin/'):
         admin_url = f"{admin_url}/admin"
 
+    # Add user_id to URL for admin check
+    admin_url = f"{admin_url}?user_id={user_id}"
+
     logger.info(f"Admin panel URL: {admin_url}")
 
     # Create inline keyboard with WebApp button

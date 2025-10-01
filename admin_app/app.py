@@ -20,6 +20,15 @@ def setup_admin_routes(aiohttp_app):
 
     # Serve index.html at root
     async def serve_admin_index(request):
+        # Check admin access for HTML page too
+        try:
+            check_admin(request)
+        except web.HTTPForbidden as e:
+            return web.Response(
+                text=f"Access Denied: {e.text}\n\nOnly admins can access this panel.",
+                status=403
+            )
+
         index_file = static_dir / "index.html"
         if index_file.exists():
             return web.FileResponse(index_file)
@@ -33,10 +42,33 @@ def setup_admin_routes(aiohttp_app):
             return web.FileResponse(file_path)
         return web.Response(text=f"File not found: {filename}", status=404)
 
+    # Helper: Check admin access
+    def check_admin(request):
+        """Check if request is from admin"""
+        from config import config
+
+        # Get user_id from query params (passed from Telegram WebApp)
+        user_id = request.query.get('user_id')
+
+        if not user_id:
+            raise web.HTTPForbidden(text="Access denied: user_id required")
+
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            raise web.HTTPForbidden(text="Access denied: invalid user_id")
+
+        if user_id not in config.ADMIN_IDS:
+            raise web.HTTPForbidden(text=f"Access denied: user {user_id} is not admin")
+
+        return user_id
+
     # API endpoints for admin panel
     async def get_stats(request):
         """Get overall statistics"""
         try:
+            check_admin(request)  # Check admin access
+
             from bot.database import db
             from datetime import datetime
 
@@ -56,6 +88,8 @@ def setup_admin_routes(aiohttp_app):
     async def get_daily_stats(request):
         """Get daily statistics for last N days"""
         try:
+            check_admin(request)  # Check admin access
+
             from bot.database import db
             from datetime import datetime, timedelta
 
@@ -78,6 +112,8 @@ def setup_admin_routes(aiohttp_app):
     async def get_users(request):
         """Get users list with pagination"""
         try:
+            check_admin(request)  # Check admin access
+
             from bot.database import db
 
             page = int(request.query.get('page', 1))

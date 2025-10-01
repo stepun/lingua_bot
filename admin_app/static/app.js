@@ -11,12 +11,23 @@ let currentUser = null;
 
 // Helper: API request with auth
 async function apiRequest(endpoint, options = {}) {
+    // Add user_id to query params for admin check
+    const userId = currentUser ? currentUser.id : null;
+
+    if (!userId) {
+        throw new Error('User ID not available');
+    }
+
+    // Add user_id to URL
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const url = `${API_BASE}${endpoint}${separator}user_id=${userId}`;
+
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(url, {
         ...options,
         headers
     });
