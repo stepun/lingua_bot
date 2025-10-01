@@ -134,6 +134,9 @@ def setup_admin_routes(aiohttp_app):
     # Add routes
     aiohttp_app.router.add_get('/admin', serve_admin_index)
     aiohttp_app.router.add_get('/admin/', serve_admin_index)
+
+    # Static files (CSS, JS) - accessible without admin check for WebApp to load
+    aiohttp_app.router.add_get('/static/{filename:.+}', serve_static)
     aiohttp_app.router.add_get('/admin/{filename:.+}', serve_static)
 
     # API routes
