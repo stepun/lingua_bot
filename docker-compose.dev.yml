@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: linguabot_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: linguabot
+      POSTGRES_USER: linguabot
+      POSTGRES_PASSWORD: devpassword123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # 5433 чтобы не конфликтовать с Railway
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linguabot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - linguabot_dev
+
+  linguabot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linguabot_dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    environment:
+      - TZ=Europe/Moscow
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://linguabot:devpassword123@postgres:5432/linguabot
+      - PORT=8080
+
+    volumes:
+      - ./data:/home/linguabot/app/data
+      - ./logs:/home/linguabot/app/logs
+      - ./exports:/home/linguabot/app/exports
+      - .:/home/linguabot/app  # Mount source code for hot reload
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - linguabot_dev
+
+    labels:
+      - "project=linguabot"
+      - "environment=development"
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  linguabot_dev:
+    name: linguabot_dev_network
+    driver: bridge
