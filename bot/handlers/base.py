@@ -34,8 +34,20 @@ async def start_handler(message: Message, state: FSMContext):
 
     # Get user info
     user_info = await db.get_user(user.id)
-    is_premium = user_info.get('is_premium', False)
-    premium_until = user_info.get('premium_until')
+
+    # Check active subscription from subscriptions table
+    from datetime import datetime
+    async with db_adapter.get_connection() as conn:
+        subscription = await conn.fetchone("""
+            SELECT expires_at FROM subscriptions
+            WHERE user_id = $1
+              AND status = 'active'
+              AND expires_at > $2
+            ORDER BY expires_at DESC LIMIT 1
+        """, user.id, datetime.now())
+
+    is_premium = subscription is not None
+    premium_until = subscription['expires_at'] if subscription else None
 
     welcome_text = get_welcome_text(
         language=user_info.get('interface_language', 'ru'),
