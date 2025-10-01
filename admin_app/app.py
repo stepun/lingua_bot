@@ -33,10 +33,77 @@ def setup_admin_routes(aiohttp_app):
             return web.FileResponse(file_path)
         return web.Response(text=f"File not found: {filename}", status=404)
 
+    # API endpoints for admin panel
+    async def get_stats(request):
+        """Get overall statistics"""
+        try:
+            from bot.database import db
+            from datetime import datetime
+
+            total_users = await db.get_user_count()
+            premium_users = await db.get_premium_user_count()
+            today_stats = await db.get_statistics(datetime.now())
+
+            return web.json_response({
+                "total_users": total_users,
+                "premium_users": premium_users,
+                "active_today": today_stats.get("active_users", 0) if today_stats else 0,
+                "translations_today": today_stats.get("translations", 0) if today_stats else 0
+            })
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def get_daily_stats(request):
+        """Get daily statistics for last N days"""
+        try:
+            from bot.database import db
+            from datetime import datetime, timedelta
+
+            days = int(request.query.get('days', 7))
+            stats = []
+
+            for i in range(days):
+                date = datetime.now() - timedelta(days=i)
+                day_stats = await db.get_statistics(date)
+                stats.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "translations": day_stats.get("translations", 0) if day_stats else 0,
+                    "users": day_stats.get("active_users", 0) if day_stats else 0
+                })
+
+            return web.json_response({"stats": list(reversed(stats))})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def get_users(request):
+        """Get users list with pagination"""
+        try:
+            from bot.database import db
+
+            page = int(request.query.get('page', 1))
+            per_page = int(request.query.get('per_page', 10))
+
+            users = await db.get_all_users(limit=per_page, offset=(page-1)*per_page)
+            total = await db.get_user_count()
+
+            return web.json_response({
+                "users": [{"id": u.id, "username": u.username, "is_premium": u.is_premium} for u in users],
+                "total": total,
+                "page": page,
+                "per_page": per_page
+            })
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
     # Add routes
     aiohttp_app.router.add_get('/admin', serve_admin_index)
     aiohttp_app.router.add_get('/admin/', serve_admin_index)
     aiohttp_app.router.add_get('/admin/{filename:.+}', serve_static)
+
+    # API routes
+    aiohttp_app.router.add_get('/api/stats/', get_stats)
+    aiohttp_app.router.add_get('/api/stats/daily', get_daily_stats)
+    aiohttp_app.router.add_get('/api/users/', get_users)
 
     return aiohttp_app
 
