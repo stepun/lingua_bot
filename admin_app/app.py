@@ -128,7 +128,7 @@ def setup_admin_routes(aiohttp_app):
                        FROM users
                        ORDER BY created_at DESC
                        LIMIT ? OFFSET ?""",
-                    (per_page, (page-1)*per_page)
+                    per_page, (page-1)*per_page
                 )
                 rows = await cursor.fetchall()
 
@@ -193,7 +193,7 @@ def setup_admin_routes(aiohttp_app):
                        {where_clause}
                        ORDER BY th.created_at DESC
                        LIMIT ? OFFSET ?""",
-                    (per_page, (page-1)*per_page)
+                    per_page, (page-1)*per_page
                 )
                 rows = await cursor.fetchall()
 
