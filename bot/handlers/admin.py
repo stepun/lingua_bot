@@ -79,6 +79,12 @@ async def open_admin_webapp(message: Message):
     # Get the admin panel URL from config or use default
     admin_url = os.getenv("ADMIN_PANEL_URL", "http://localhost:8081")
 
+    # Ensure URL has https:// protocol for Telegram WebApp
+    if not admin_url.startswith(('http://', 'https://')):
+        admin_url = f"https://{admin_url}"
+
+    logger.info(f"Admin panel URL: {admin_url}")
+
     # Create inline keyboard with WebApp button
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
