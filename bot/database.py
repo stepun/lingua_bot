@@ -312,6 +312,12 @@ class Database:
         migration_files = sorted(glob.glob(str(migrations_dir / '*.sql')))
         print(f"[MIGRATIONS] Found {len(migration_files)} migration files: {[os.path.basename(f) for f in migration_files]}")
 
+        # Additional debug info for migration detection
+        if migrations_dir.exists():
+            import os as _os
+            all_files = _os.listdir(migrations_dir)
+            print(f"[MIGRATIONS] All files in migrations dir: {all_files}")
+
         if not migration_files:
             print("[MIGRATIONS] No migration files found")
             return
