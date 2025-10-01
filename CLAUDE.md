@@ -258,26 +258,54 @@ XXX_description.sql
    ALTER TABLE users ADD COLUMN IF NOT EXISTS new_field TEXT DEFAULT '';
    ```
 
-3. Restart bot to apply:
+3. **Local (Docker)**: Restart bot to apply:
    ```bash
    docker compose -f docker-compose.dev.yml restart linguabot
    ```
 
-4. Verify:
+4. **Railway (Production)**: Apply manually (see below)
+
+5. Verify:
    ```bash
+   # Local Docker
    docker exec linguabot_postgres_dev psql -U linguabot -d linguabot -c "SELECT * FROM schema_migrations;"
+
+   # Railway
+   python3 apply_migrations_public.py
    ```
+
+### Applying Migrations on Railway
+
+⚠️ **IMPORTANT**: Automatic migrations are **DISABLED** on Railway due to deployment hangs.
+
+Migrations must be applied manually after deployment:
+
+```bash
+# Apply migrations via public Railway URL
+python3 apply_migrations_public.py
+```
+
+This script:
+1. Connects to Railway PostgreSQL via public URL
+2. Shows current migration state
+3. Applies pending migrations
+4. Verifies results
+
+**Why manual?** Automatic migrations cause Railway deployments to hang indefinitely during database initialization. Manual application avoids this issue.
 
 ### Existing Migrations
 
 - `001_add_is_blocked.sql`: User blocking feature (Task 2.1)
 - `002_add_performance_metrics.sql`: Performance tracking (Task 2.4)
 - `003_remove_premium_fields.sql`: Remove redundant premium fields from users table
+- `004_reset_migration_003.sql`: Reset migration 003 for re-application
+- `005_add_test_field.sql`: Test field for migration system validation (can be removed)
 
 ### Important Notes
 
 - ⚠️ **Never delete or modify existing migration files**
 - ⚠️ **Never change version numbers of applied migrations**
+- ⚠️ **On Railway: migrations MUST be applied manually via `apply_migrations_public.py`**
 - ✅ **Always use `IF NOT EXISTS` / `IF EXISTS` for safety**
 - ✅ **Always test on dev environment first**
 - ✅ **Docker volume `postgres_dev_data` persists data between restarts**
