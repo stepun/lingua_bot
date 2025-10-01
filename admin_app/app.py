@@ -122,7 +122,7 @@ def setup_admin_routes(aiohttp_app):
 
             # Get users directly from database with SQL
             async with db_adapter.get_connection() as conn:
-                cursor = await conn.execute(
+                rows = await conn.fetchall(
                     """SELECT user_id, username, first_name, last_name,
                               is_premium, total_translations, created_at
                        FROM users
@@ -130,7 +130,6 @@ def setup_admin_routes(aiohttp_app):
                        LIMIT ? OFFSET ?""",
                     per_page, (page-1)*per_page
                 )
-                rows = await cursor.fetchall()
 
                 users = []
                 for row in rows:
@@ -185,7 +184,7 @@ def setup_admin_routes(aiohttp_app):
                 where_clause = "WHERE is_voice = 0"
 
             async with db_adapter.get_connection() as conn:
-                cursor = await conn.execute(
+                rows = await conn.fetchall(
                     f"""SELECT th.id, th.user_id, u.username, th.source_language, th.target_language,
                                th.source_text, th.basic_translation, th.created_at, th.is_voice
                        FROM translation_history th
@@ -195,7 +194,6 @@ def setup_admin_routes(aiohttp_app):
                        LIMIT ? OFFSET ?""",
                     per_page, (page-1)*per_page
                 )
-                rows = await cursor.fetchall()
 
                 logs = []
                 for row in rows:
@@ -212,10 +210,10 @@ def setup_admin_routes(aiohttp_app):
                     })
 
                 # Get total count
-                cursor = await conn.execute(
+                total_row = await conn.fetchone(
                     f"SELECT COUNT(*) FROM translation_history {where_clause}"
                 )
-                total = (await cursor.fetchone())[0]
+                total = total_row[0] if total_row else 0
 
             return web.json_response({
                 "logs": logs,
@@ -238,7 +236,7 @@ def setup_admin_routes(aiohttp_app):
 
             async with db_adapter.get_connection() as conn:
                 # Source languages
-                cursor = await conn.execute(
+                source_rows = await conn.fetchall(
                     """SELECT source_language, COUNT(*) as count
                        FROM translation_history
                        WHERE source_language IS NOT NULL
@@ -246,10 +244,10 @@ def setup_admin_routes(aiohttp_app):
                        ORDER BY count DESC
                        LIMIT 10"""
                 )
-                source_langs = [{"lang": row[0] or "auto", "count": row[1]} for row in await cursor.fetchall()]
+                source_langs = [{"lang": row[0] or "auto", "count": row[1]} for row in source_rows]
 
                 # Target languages
-                cursor = await conn.execute(
+                target_rows = await conn.fetchall(
                     """SELECT target_language, COUNT(*) as count
                        FROM translation_history
                        WHERE target_language IS NOT NULL
@@ -257,7 +255,7 @@ def setup_admin_routes(aiohttp_app):
                        ORDER BY count DESC
                        LIMIT 10"""
                 )
-                target_langs = [{"lang": row[0] or "en", "count": row[1]} for row in await cursor.fetchall()]
+                target_langs = [{"lang": row[0] or "en", "count": row[1]} for row in target_rows]
 
             return web.json_response({
                 "source_languages": source_langs,
