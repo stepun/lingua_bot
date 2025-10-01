@@ -290,10 +290,11 @@ class Database:
             await conn.commit()
 
         # Apply migrations after initial schema setup
-        await self.apply_migrations()
+        # TODO: Temporarily disabled - Railway deployment hangs with migrations
+        # await self.apply_migrations()
 
         # Auto-repair schema if migrations were marked as applied but columns are missing
-        await self.verify_and_repair_schema()
+        # await self.verify_and_repair_schema()
 
     async def apply_migrations(self):
         """Apply pending database migrations from migrations/ folder"""
