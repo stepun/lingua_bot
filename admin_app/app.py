@@ -20,15 +20,8 @@ def setup_admin_routes(aiohttp_app):
 
     # Serve index.html at root
     async def serve_admin_index(request):
-        # Check admin access for HTML page too
-        try:
-            check_admin(request)
-        except web.HTTPForbidden as e:
-            return web.Response(
-                text=f"Access Denied: {e.text}\n\nOnly admins can access this panel.",
-                status=403
-            )
-
+        # For HTML page, we can't check auth yet (initData is only available in JS)
+        # So we just serve the page and let JS handle authentication
         index_file = static_dir / "index.html"
         if index_file.exists():
             return web.FileResponse(index_file)
@@ -44,21 +37,35 @@ def setup_admin_routes(aiohttp_app):
 
     # Helper: Check admin access
     def check_admin(request):
-        """Check if request is from admin"""
+        """Check if request is from admin using Telegram WebApp authentication"""
         from config import config
+        from admin_app.auth import validate_telegram_webapp_data, is_admin
+        import json
 
-        # Get user_id from query params (passed from Telegram WebApp)
-        user_id = request.query.get('user_id')
+        # Get Telegram init data from header
+        init_data = request.headers.get('X-Telegram-Init-Data')
+
+        if not init_data:
+            raise web.HTTPForbidden(text="Access denied: Telegram authentication required")
+
+        # Validate Telegram data
+        validated_data = validate_telegram_webapp_data(init_data)
+
+        if not validated_data:
+            raise web.HTTPForbidden(text="Access denied: Invalid Telegram data")
+
+        # Extract user data
+        try:
+            user_json = validated_data.get('user', '{}')
+            user_data = json.loads(user_json)
+            user_id = user_data.get('id')
+        except (json.JSONDecodeError, AttributeError):
+            raise web.HTTPForbidden(text="Access denied: Invalid user data")
 
         if not user_id:
-            raise web.HTTPForbidden(text="Access denied: user_id required")
+            raise web.HTTPForbidden(text="Access denied: user_id not found")
 
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            raise web.HTTPForbidden(text="Access denied: invalid user_id")
-
-        if user_id not in config.ADMIN_IDS:
+        if not is_admin(user_id):
             raise web.HTTPForbidden(text=f"Access denied: user {user_id} is not admin")
 
         return user_id
@@ -119,17 +126,51 @@ def setup_admin_routes(aiohttp_app):
 
             page = int(request.query.get('page', 1))
             per_page = int(request.query.get('per_page', 10))
+            search = request.query.get('search', '').strip()
+            premium_only = request.query.get('premium_only', '').lower() == 'true'
+
+            # Build WHERE clause
+            where_conditions = []
+            params = []
+
+            if search:
+                where_conditions.append(
+                    "(u.username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR CAST(u.user_id AS TEXT) LIKE ?)"
+                )
+                search_param = f"%{search}%"
+                params.extend([search_param, search_param, search_param, search_param])
+
+            if premium_only:
+                where_conditions.append(
+                    """EXISTS (
+                        SELECT 1 FROM subscriptions s
+                        WHERE s.user_id = u.user_id
+                          AND s.status = 'active'
+                          AND s.expires_at > CURRENT_TIMESTAMP
+                    )"""
+                )
+
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
             # Get users directly from database with SQL
             async with db_adapter.get_connection() as conn:
-                rows = await conn.fetchall(
-                    """SELECT user_id, username, first_name, last_name,
-                              is_premium, total_translations, created_at
-                       FROM users
-                       ORDER BY created_at DESC
-                       LIMIT ? OFFSET ?""",
-                    per_page, (page-1)*per_page
-                )
+                query = f"""SELECT u.user_id, u.username, u.first_name, u.last_name,
+                              u.total_translations, u.created_at,
+                              CASE
+                                WHEN EXISTS (
+                                  SELECT 1 FROM subscriptions s
+                                  WHERE s.user_id = u.user_id
+                                    AND s.status = 'active'
+                                    AND s.expires_at > CURRENT_TIMESTAMP
+                                ) THEN 1 ELSE 0
+                              END as is_premium
+                       FROM users u
+                       {where_clause}
+                       ORDER BY u.created_at DESC
+                       LIMIT ? OFFSET ?"""
+
+                params.extend([per_page, (page-1)*per_page])
+                rows = await conn.fetchall(query, *params)
 
                 users = []
                 for row in rows:
@@ -137,12 +178,15 @@ def setup_admin_routes(aiohttp_app):
                         "id": row[0],
                         "username": row[1] or "N/A",
                         "name": f"{row[2] or ''} {row[3] or ''}".strip() or "N/A",
-                        "is_premium": bool(row[4]),
-                        "total_translations": row[5] or 0,
-                        "created_at": str(row[6]) if row[6] else None
+                        "is_premium": bool(row[6]),
+                        "total_translations": row[4] or 0,
+                        "created_at": str(row[5]) if row[5] else None
                     })
 
-            total = await db.get_user_count()
+                # Get total count with same filters
+                count_query = f"SELECT COUNT(*) FROM users u {where_clause}"
+                total_row = await conn.fetchone(count_query, *params[:-2])  # Exclude LIMIT/OFFSET params
+                total = total_row[0] if total_row else 0
 
             return web.json_response({
                 "users": users,

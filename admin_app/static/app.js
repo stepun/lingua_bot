@@ -11,19 +11,18 @@ let currentUser = null;
 
 // Helper: API request with auth
 async function apiRequest(endpoint, options = {}) {
-    // Add user_id to query params for admin check
-    const userId = currentUser ? currentUser.id : null;
+    // Get Telegram WebApp initData for authentication
+    const initData = tg.initData;
 
-    if (!userId) {
-        throw new Error('User ID not available');
+    if (!initData) {
+        throw new Error('Telegram WebApp data not available');
     }
 
-    // Add user_id to URL
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const url = `${API_BASE}${endpoint}${separator}user_id=${userId}`;
+    const url = `${API_BASE}${endpoint}`;
 
     const headers = {
         'Content-Type': 'application/json',
+        'X-Telegram-Init-Data': initData,
         ...options.headers
     };
 
@@ -77,21 +76,29 @@ async function init() {
     try {
         showLoading();
 
-        // Get current user info from Telegram or URL params
+        // Security check: Must be opened through Telegram WebApp
+        if (!tg.initData) {
+            hideLoading();
+            document.getElementById('app').innerHTML = `
+                <div class="flex items-center justify-center min-h-screen bg-gray-100">
+                    <div class="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
+                        <div class="text-6xl mb-4">🔒</div>
+                        <h1 class="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+                        <p class="text-gray-600 mb-4">This admin panel can only be accessed through Telegram Bot.</p>
+                        <p class="text-sm text-gray-500">Please use the /admin_panel command in the bot.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Get current user info from Telegram
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             currentUser = tg.initDataUnsafe.user;
             document.getElementById('userInfo').textContent =
                 `${currentUser.first_name || currentUser.username || 'Admin'}`;
         } else {
-            // Fallback: get user_id from URL for browser testing
-            const urlParams = new URLSearchParams(window.location.search);
-            const userId = urlParams.get('user_id');
-            if (userId) {
-                currentUser = { id: parseInt(userId) };
-                document.getElementById('userInfo').textContent = `Admin (ID: ${userId})`;
-            } else {
-                document.getElementById('userInfo').textContent = 'Admin';
-            }
+            document.getElementById('userInfo').textContent = 'Admin';
         }
 
         // Set up theme
@@ -124,11 +131,20 @@ function setupTabs() {
             const tabName = btn.dataset.tab;
 
             // Update active states
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
+            tabBtns.forEach(b => {
+                b.classList.remove('active', 'text-blue-600', 'border-b-blue-600');
+                b.classList.add('text-gray-600', 'border-b-transparent');
+            });
+            tabContents.forEach(c => {
+                c.classList.add('hidden');
+                c.classList.remove('active');
+            });
 
-            btn.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
+            btn.classList.add('active', 'text-blue-600', 'border-b-blue-600');
+            btn.classList.remove('text-gray-600', 'border-b-transparent');
+            const content = document.getElementById(tabName);
+            content.classList.remove('hidden');
+            content.classList.add('active');
 
             // Load tab data
             switch(tabName) {
@@ -155,12 +171,12 @@ async function loadDashboard() {
         const stats = await apiRequest('/api/stats/');
         document.getElementById('totalUsers').textContent = stats.total_users;
         document.getElementById('premiumUsers').textContent = stats.premium_users;
-        document.getElementById('activeToday').textContent = stats.today.active_users;
-        document.getElementById('translationsToday').textContent = stats.today.translations;
+        document.getElementById('activeToday').textContent = stats.active_today;
+        document.getElementById('translationsToday').textContent = stats.translations_today;
 
         // Load daily stats
         const dailyData = await apiRequest('/api/stats/daily?days=7');
-        renderDailyStats(dailyData.data);
+        renderDailyStats(dailyData.stats);
 
         // Load language stats
         const langData = await apiRequest('/api/stats/languages');
@@ -177,12 +193,11 @@ async function loadDashboard() {
 function renderDailyStats(data) {
     const container = document.getElementById('dailyStats');
     container.innerHTML = data.map(stat => `
-        <div class="daily-stat-row">
-            <span class="daily-stat-date">${formatDate(stat.date)}</span>
-            <div class="daily-stat-values">
-                <span>👥 ${stat.active_users}</span>
-                <span>💬 ${stat.total_translations}</span>
-                <span>🎤 ${stat.voice_translations}</span>
+        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg text-sm">
+            <span class="font-semibold text-gray-800">${formatDate(stat.date)}</span>
+            <div class="flex gap-3 text-xs text-gray-600">
+                <span>👥 ${stat.users}</span>
+                <span>💬 ${stat.translations}</span>
             </div>
         </div>
     `).join('');
@@ -194,18 +209,18 @@ function renderLanguageStats(data) {
     const targetLangs = document.getElementById('targetLangs');
 
     sourceLangs.innerHTML = data.source_languages.map(lang => `
-        <div class="lang-item">
+        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0 text-sm text-gray-800">
             <span>${lang.source_language || 'Unknown'}</span>
-            <span><strong>${lang.count}</strong></span>
+            <span class="font-bold">${lang.count}</span>
         </div>
-    `).join('') || '<div class="lang-item">No data</div>';
+    `).join('') || '<div class="text-sm text-gray-500">No data</div>';
 
     targetLangs.innerHTML = data.target_languages.map(lang => `
-        <div class="lang-item">
+        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0 text-sm text-gray-800">
             <span>${lang.target_language || 'Unknown'}</span>
-            <span><strong>${lang.count}</strong></span>
+            <span class="font-bold">${lang.count}</span>
         </div>
-    `).join('') || '<div class="lang-item">No data</div>';
+    `).join('') || '<div class="text-sm text-gray-500">No data</div>';
 }
 
 // Load Users
@@ -236,20 +251,20 @@ function renderUsers(data) {
     const container = document.getElementById('usersList');
 
     container.innerHTML = data.users.map(user => `
-        <div class="user-card">
-            <div class="user-header">
-                <span class="user-name">${user.first_name || user.username || 'User'} ${user.last_name || ''}</span>
-                ${user.is_premium ? '<span class="user-badge">PREMIUM</span>' : ''}
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold text-base text-gray-900">${user.name || user.username || 'User'}</span>
+                ${user.is_premium ? '<span class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-2 py-1 rounded-full text-xs font-semibold">PREMIUM</span>' : ''}
             </div>
-            <div class="user-info">
-                ID: ${user.user_id} |
+            <div class="text-xs text-gray-600 mb-2">
+                ID: ${user.id} |
                 Translations: ${user.total_translations} |
                 Joined: ${formatDate(user.created_at)}
             </div>
-            <div class="user-actions">
-                <button class="btn-primary" onclick="viewUser(${user.user_id})">View</button>
+            <div class="flex gap-2">
+                <button class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600 transition" onclick="viewUser(${user.id})">View</button>
                 ${!user.is_premium ?
-                    `<button class="btn-secondary" onclick="grantPremium(${user.user_id})">Grant Premium</button>` :
+                    `<button class="px-3 py-1.5 bg-gray-100 text-gray-800 rounded-lg text-xs font-medium hover:bg-gray-200 transition" onclick="grantPremium(${user.id})">Grant Premium</button>` :
                     ''
                 }
             </div>
@@ -257,22 +272,29 @@ function renderUsers(data) {
     `).join('');
 
     // Update pagination
-    document.getElementById('pageInfo').textContent = `Page ${data.page} of ${data.total_pages}`;
+    const totalPages = Math.ceil(data.total / data.per_page);
+    document.getElementById('pageInfo').textContent = `Page ${data.page} of ${totalPages}`;
     document.getElementById('prevPage').disabled = data.page === 1;
-    document.getElementById('nextPage').disabled = data.page === data.total_pages;
+    document.getElementById('nextPage').disabled = data.page >= totalPages;
 }
 
 // View user details
 async function viewUser(userId) {
     try {
         showLoading();
-        const data = await apiRequest(`/api/users/${userId}`);
+        // Get user from current users list (API doesn't have individual user endpoint)
+        const usersData = await apiRequest(`/api/users/?page=1&per_page=100`);
+        const user = usersData.users.find(u => u.id === userId);
         hideLoading();
 
-        const user = data.user;
+        if (!user) {
+            tg.showAlert('User not found');
+            return;
+        }
+
         const message = `
-User: ${user.first_name || ''} ${user.last_name || ''}
-ID: ${user.user_id}
+User: ${user.name || user.username || 'User'}
+ID: ${user.id}
 Username: @${user.username || 'none'}
 Premium: ${user.is_premium ? 'Yes' : 'No'}
 Total Translations: ${user.total_translations}
@@ -308,9 +330,9 @@ async function loadLogs() {
         const logsData = await apiRequest('/api/logs/translations?per_page=20');
         renderTranslationLogs(logsData.logs);
 
-        // Load system logs
-        const systemLogs = await apiRequest('/api/logs/system?lines=50');
-        renderSystemLogs(systemLogs.logs);
+        // System logs temporarily disabled (not implemented)
+        // const systemLogs = await apiRequest('/api/logs/system?lines=50');
+        // renderSystemLogs(systemLogs.logs);
 
         hideLoading();
     } catch (error) {
@@ -324,19 +346,19 @@ function renderTranslationLogs(logs) {
     const container = document.getElementById('translationLogs');
 
     container.innerHTML = logs.map(log => `
-        <div class="log-item">
-            <div class="log-header">
-                <span>${log.first_name || log.username || 'User'}</span>
-                <span>${formatDateTime(log.created_at)}</span>
+        <div class="bg-white p-3 rounded-lg border-l-4 border-blue-500 text-xs">
+            <div class="flex justify-between mb-1.5 font-semibold text-gray-900">
+                <span>${log.username || 'User'}</span>
+                <span class="text-gray-500">${formatDateTime(log.created_at)}</span>
             </div>
-            <div class="log-body">
-                ${log.source_language} → ${log.target_language}
+            <div class="text-gray-600">
+                ${log.source_lang || 'auto'} → ${log.target_lang || 'en'}
                 ${log.is_voice ? '🎤' : '💬'}
                 <br>
-                <small>${(log.source_text || '').substring(0, 50)}...</small>
+                <span class="text-xs">${(log.source_text || '').substring(0, 50)}...</span>
             </div>
         </div>
-    `).join('') || '<p>No logs found</p>';
+    `).join('') || '<p class="text-sm text-gray-500">No logs found</p>';
 }
 
 // Render system logs
