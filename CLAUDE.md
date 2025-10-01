@@ -48,6 +48,12 @@ python main_fixed.py          # Version with error handling
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Run tests
+python test_translation.py     # Test translation APIs with timeout
+python test_payments.py        # Test payment system
+python test_callbacks.py       # Test callback handlers
+python test_main_bot.py        # Test main bot functionality
 ```
 
 ### Docker Development
@@ -56,8 +62,8 @@ pip install -r requirements.txt
 docker-compose up --build -d
 
 # Use management scripts
-./docker-start.sh              # Linux/macOS
-docker-start.bat              # Windows
+./docker-start.sh              # Interactive menu for Docker management
+docker-start.bat              # Windows version
 
 # View logs
 docker-compose logs -f linguabot
@@ -81,7 +87,9 @@ Required variables in `.env`:
 Optional but recommended:
 - `DEEPL_API_KEY` - For best translation quality
 - `YANDEX_API_KEY` - For good Russian language support
-- `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` - For payment processing
+- `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` - For YooKassa payments
+- `PROVIDER_TOKEN` - For Telegram native payments
+- `ELEVENLABS_API_KEY` - For premium voice synthesis
 
 ## Key Service Interactions
 
@@ -98,9 +106,10 @@ Optional but recommended:
 - Handled in `bot/services/voice.py`
 
 ### Payment System
-- YooKassa integration in `bot/services/payment.py`
+- YooKassa and Telegram native payments in `bot/services/payment.py`
 - Webhook handling in `bot/handlers/payments.py`
 - Subscription management in database layer
+- Receipt generation for fiscal compliance (provider_data)
 
 ## Docker Architecture
 
@@ -166,6 +175,27 @@ Voice handlers have strict data isolation:
 3. **Voice Handlers**: Use memory first, fallback to database for reliability
 4. **Data Isolation**: Each voice type has dedicated data source to prevent mixing
 
+## Monitoring System
+
+- `bot_monitor.py` - Process monitoring with auto-restart
+- PID tracking in `/tmp/bot.pid` and `/tmp/monitor.pid`
+- Automatic health checks and recovery
+- Detailed logging in `logs/bot.log` and `logs/monitor.log`
+
+## Testing Infrastructure
+
+The codebase includes several test files:
+- Direct API testing with configurable timeouts
+- Payment flow verification
+- Callback handler validation
+- Main bot functionality tests
+
+## Middleware Architecture
+
+- `bot/middlewares/throttling.py` - Rate limiting (configurable in config)
+- `bot/middlewares/user_middleware.py` - Automatic user registration
+- `bot/middlewares/admin.py` - Admin access control
+
 ## Common Issues
 
 1. **Module import errors**: Use `main_minimal.py` for environments without pip/venv
@@ -176,3 +206,4 @@ Voice handlers have strict data isolation:
    - Invalid voice_type (must be: alloy, echo, fable, onyx, nova, shimmer, ash, sage, coral)
    - Check OpenAI API key and ElevenLabs configuration
    - Ensure Telegram voice message permissions are enabled
+6. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation

@@ -115,13 +115,13 @@ def setup_admin_routes(aiohttp_app):
             check_admin(request)  # Check admin access
 
             from bot.database import db
+            from bot.db_adapter import db_adapter
 
             page = int(request.query.get('page', 1))
             per_page = int(request.query.get('per_page', 10))
 
             # Get users directly from database with SQL
-            import aiosqlite
-            async with aiosqlite.connect(db.db_path) as conn:
+            async with db_adapter.get_connection() as conn:
                 cursor = await conn.execute(
                     """SELECT user_id, username, first_name, last_name,
                               is_premium, total_translations, created_at
@@ -171,7 +171,7 @@ def setup_admin_routes(aiohttp_app):
             check_admin(request)
 
             from bot.database import db
-            import aiosqlite
+            from bot.db_adapter import db_adapter
 
             page = int(request.query.get('page', 1))
             per_page = int(request.query.get('per_page', 20))
@@ -184,7 +184,7 @@ def setup_admin_routes(aiohttp_app):
             elif filter_type == "text":
                 where_clause = "WHERE is_voice = 0"
 
-            async with aiosqlite.connect(db.db_path) as conn:
+            async with db_adapter.get_connection() as conn:
                 cursor = await conn.execute(
                     f"""SELECT th.id, th.user_id, u.username, th.source_language, th.target_language,
                                th.source_text, th.basic_translation, th.created_at, th.is_voice
@@ -234,9 +234,9 @@ def setup_admin_routes(aiohttp_app):
             check_admin(request)
 
             from bot.database import db
-            import aiosqlite
+            from bot.db_adapter import db_adapter
 
-            async with aiosqlite.connect(db.db_path) as conn:
+            async with db_adapter.get_connection() as conn:
                 # Source languages
                 cursor = await conn.execute(
                     """SELECT source_language, COUNT(*) as count
