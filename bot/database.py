@@ -524,7 +524,7 @@ class Database:
             return True
 
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user information"""
+        """Get user information with dynamic premium status"""
         async with db_adapter.get_connection() as conn:
             cursor = await conn.execute('''
                 SELECT u.*, s.auto_voice, s.save_history, s.notifications_enabled,
@@ -534,7 +534,22 @@ class Database:
                 WHERE u.user_id = ?
             ''', user_id)
             row = await cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+
+            user_data = dict(row)
+
+            # Add dynamic premium status from subscriptions table
+            subscription = await conn.fetchone('''
+                SELECT expires_at FROM subscriptions
+                WHERE user_id = ? AND status = 'active' AND expires_at > ?
+                ORDER BY expires_at DESC LIMIT 1
+            ''', user_id, datetime.now())
+
+            user_data['is_premium'] = subscription is not None
+            user_data['premium_until'] = subscription['expires_at'] if subscription else None
+
+            return user_data
 
     async def update_user_language(self, user_id: int, target_language: str) -> bool:
         """Update user's target translation language"""
