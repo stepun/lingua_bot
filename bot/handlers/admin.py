@@ -53,8 +53,14 @@ async def admin_panel(message: Message):
 @router.message(Command("admin_panel"))
 async def open_admin_webapp(message: Message):
     """Open admin mini-app"""
+    logger.info(f"Admin panel command from user {message.from_user.id}, ADMIN_IDS: {config.ADMIN_IDS}")
+
     if not is_admin(message.from_user.id):
-        await message.answer("❌ У вас нет прав администратора")
+        await message.answer(
+            f"❌ У вас нет прав администратора\n\n"
+            f"Ваш ID: `{message.from_user.id}`\n"
+            f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS"
+        )
         return
 
     # Get the admin panel URL from config or use default
