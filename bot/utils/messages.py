@@ -29,6 +29,7 @@ MESSAGES = {
 • /стиль — выбрать стиль перевода
 • /настройки — настройки бота
 • /премиум — информация о подписке
+• /отзыв — оставить отзыв о боте
 
 *Стили перевода:*
 • 😊 Неформальный — для общения с друзьями
@@ -198,6 +199,7 @@ Choose an action from the menu below or just send text for translation.""",
 • /style — choose translation style
 • /settings — bot settings
 • /premium — subscription info
+• /feedback — leave feedback about the bot
 
 *Translation styles:*
 • 😊 Informal — for chatting with friends
