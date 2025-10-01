@@ -80,7 +80,7 @@ def setup_admin_routes(aiohttp_app):
                 "total_users": total_users,
                 "premium_users": premium_users,
                 "active_today": today_stats.get("active_users", 0) if today_stats else 0,
-                "translations_today": today_stats.get("translations", 0) if today_stats else 0
+                "translations_today": today_stats.get("total_translations", 0) if today_stats else 0
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
@@ -101,7 +101,7 @@ def setup_admin_routes(aiohttp_app):
                 day_stats = await db.get_statistics(date)
                 stats.append({
                     "date": date.strftime("%Y-%m-%d"),
-                    "translations": day_stats.get("translations", 0) if day_stats else 0,
+                    "translations": day_stats.get("total_translations", 0) if day_stats else 0,
                     "users": day_stats.get("active_users", 0) if day_stats else 0
                 })
 
@@ -120,7 +120,8 @@ def setup_admin_routes(aiohttp_app):
             per_page = int(request.query.get('per_page', 10))
 
             # Get users directly from database with SQL
-            async with db.get_connection() as conn:
+            import aiosqlite
+            async with aiosqlite.connect(db.db_path) as conn:
                 cursor = await conn.execute(
                     """SELECT user_id, username, first_name, last_name,
                               is_premium, is_blocked, created_at
