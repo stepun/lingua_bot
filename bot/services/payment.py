@@ -86,3 +86,5 @@ class TelegramPaymentService:
             logger.error(f"Error creating Telegram invoice: {e}")
             return None
 
+# Alias for backward compatibility
+PaymentService = TelegramPaymentService
