@@ -10,6 +10,36 @@ import json
 from admin_app.auth import validate_telegram_webapp_data, is_admin
 from admin_app.api import stats, users, logs
 
+
+def setup_admin_routes(aiohttp_app):
+    """Setup admin panel routes in aiohttp app"""
+    from aiohttp import web
+
+    # Get static directory
+    static_dir = Path(__file__).parent / "static"
+
+    # Serve index.html at root
+    async def serve_admin_index(request):
+        index_file = static_dir / "index.html"
+        if index_file.exists():
+            return web.FileResponse(index_file)
+        return web.Response(text="Admin panel not found", status=404)
+
+    # Serve static files
+    async def serve_static(request):
+        filename = request.match_info.get('filename', '')
+        file_path = static_dir / filename
+        if file_path.exists() and file_path.is_file():
+            return web.FileResponse(file_path)
+        return web.Response(text=f"File not found: {filename}", status=404)
+
+    # Add routes
+    aiohttp_app.router.add_get('/admin', serve_admin_index)
+    aiohttp_app.router.add_get('/admin/', serve_admin_index)
+    aiohttp_app.router.add_get('/admin/{filename:.+}', serve_static)
+
+    return aiohttp_app
+
 # Initialize FastAPI app
 app = FastAPI(
     title="LinguaBot Admin Panel",

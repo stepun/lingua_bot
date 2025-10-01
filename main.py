@@ -136,6 +136,10 @@ async def main():
         webhook_handler = WebhookHandler()
         app.router.add_post('/webhook/yookassa', webhook_handler.handle_yookassa_webhook)
 
+        # Add admin panel static files and API
+        from admin_app.app import setup_admin_routes
+        setup_admin_routes(app)
+
         SimpleRequestHandler(
             dispatcher=dp,
             bot=bot
