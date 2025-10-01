@@ -353,29 +353,38 @@ class Database:
                     # Execute each statement (split by semicolons, excluding comments)
                     statements = [s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]
 
-                    # BEGIN TRANSACTION (PostgreSQL auto-starts, SQLite needs explicit)
-                    if not db_adapter.is_postgres:
+                    # Use explicit transaction for PostgreSQL (asyncpg requires this for atomic DDL+DML)
+                    if db_adapter.is_postgres:
+                        async with conn.transaction():
+                            # Execute all statements in the migration
+                            for statement in statements:
+                                if statement:
+                                    print(f"[MIGRATIONS]   Executing: {statement[:80]}...")
+                                    await conn.execute(statement)
+
+                            # Mark migration as applied (still in same transaction)
+                            await conn.execute(
+                                'INSERT INTO schema_migrations (version) VALUES ($1)',
+                                version
+                            )
+                            # Transaction commits automatically on exit
+                    else:
+                        # SQLite: use manual BEGIN/COMMIT
                         await conn.execute("BEGIN")
 
-                    # Execute all statements in the migration
-                    for statement in statements:
-                        if statement:
-                            await conn.execute(statement)
+                        # Execute all statements in the migration
+                        for statement in statements:
+                            if statement:
+                                await conn.execute(statement)
 
-                    # Mark migration as applied (still in same transaction)
-                    if db_adapter.is_postgres:
-                        await conn.execute(
-                            'INSERT INTO schema_migrations (version) VALUES ($1)',
-                            version
-                        )
-                    else:
+                        # Mark migration as applied
                         await conn.execute(
                             'INSERT INTO schema_migrations (version) VALUES (?)',
                             (version,)
                         )
 
-                    # COMMIT - both DDL and INSERT succeed together
-                    await conn.commit()
+                        await conn.commit()
+
                     migration_success = True
                     print(f"[MIGRATIONS] ✅ Applied {version}")
 
