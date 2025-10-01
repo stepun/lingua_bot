@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LinguaBot Admin</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>🔐 LinguaBot Admin</h1>
+            <div id="userInfo" class="user-info"></div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+            <button class="tab-btn" data-tab="users">👥 Users</button>
+            <button class="tab-btn" data-tab="logs">📝 Logs</button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" id="totalUsers">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Premium Users</div>
+                    <div class="stat-value" id="premiumUsers">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Today</div>
+                    <div class="stat-value" id="activeToday">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Translations Today</div>
+                    <div class="stat-value" id="translationsToday">-</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📈 Daily Statistics (Last 7 Days)</h2>
+                <div id="dailyStats" class="daily-stats"></div>
+            </div>
+
+            <div class="section">
+                <h2>🌍 Language Statistics</h2>
+                <div class="lang-stats-grid">
+                    <div class="lang-stats-col">
+                        <h3>Source Languages</h3>
+                        <div id="sourceLangs"></div>
+                    </div>
+                    <div class="lang-stats-col">
+                        <h3>Target Languages</h3>
+                        <div id="targetLangs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users" class="tab-content">
+            <div class="section">
+                <div class="controls">
+                    <input type="text" id="userSearch" placeholder="Search users..." class="search-input">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="premiumFilter">
+                        Premium only
+                    </label>
+                </div>
+                <div id="usersList" class="users-list"></div>
+                <div class="pagination">
+                    <button id="prevPage" class="btn-secondary">← Previous</button>
+                    <span id="pageInfo">Page 1</span>
+                    <button id="nextPage" class="btn-secondary">Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="section">
+                <h2>📝 Translation Logs</h2>
+                <div class="controls">
+                    <select id="logFilter" class="select-input">
+                        <option value="">All translations</option>
+                        <option value="voice">Voice only</option>
+                        <option value="text">Text only</option>
+                    </select>
+                </div>
+                <div id="translationLogs" class="logs-list"></div>
+            </div>
+
+            <div class="section">
+                <h2>🐛 System Logs (Last 50 lines)</h2>
+                <button id="refreshLogs" class="btn-primary">Refresh</button>
+                <div id="systemLogs" class="system-logs"></div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

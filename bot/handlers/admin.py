@@ -1,7 +1,7 @@
 """Admin panel handlers"""
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -35,6 +35,7 @@ async def admin_panel(message: Message):
 ✅ **Статус:** Администратор
 
 ⚙️ **Доступные команды:**
+/admin_panel - Открыть веб-панель администратора
 /admin_config - Настройка платежной системы
 /admin_stats - Статистика бота
 /admin_users - Управление пользователями
@@ -47,6 +48,37 @@ async def admin_panel(message: Message):
 """
 
     await message.answer(admin_text, parse_mode='Markdown')
+
+
+@router.message(Command("admin_panel"))
+async def open_admin_webapp(message: Message):
+    """Open admin mini-app"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ У вас нет прав администратора")
+        return
+
+    # Get the admin panel URL from config or use default
+    admin_url = os.getenv("ADMIN_PANEL_URL", "http://localhost:8081")
+
+    # Create inline keyboard with WebApp button
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🔐 Открыть Admin Panel",
+            web_app=WebAppInfo(url=admin_url)
+        )]
+    ])
+
+    await message.answer(
+        "🎛️ **Панель администратора**\n\n"
+        "Нажмите кнопку ниже, чтобы открыть веб-интерфейс админ-панели.\n\n"
+        "В панели доступны:\n"
+        "• 📊 Статистика бота\n"
+        "• 👥 Управление пользователями\n"
+        "• 📝 Просмотр логов\n"
+        "• 🌍 Аналитика по языкам",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
 
 @router.message(Command("admin_config"))
 async def admin_config(message: Message, state: FSMContext):
