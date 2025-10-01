@@ -323,6 +323,21 @@ function formatDateTime(dateString) {
     });
 }
 
+// Helper: Format time duration (milliseconds to human-readable)
+function formatDuration(ms) {
+    if (ms === 0 || !ms) return 'N/A';
+
+    if (ms < 1000) {
+        return `${ms}ms`;
+    } else if (ms < 60000) {
+        return `${(ms / 1000).toFixed(1)}s`;
+    } else {
+        const minutes = Math.floor(ms / 60000);
+        const seconds = ((ms % 60000) / 1000).toFixed(0);
+        return `${minutes}m ${seconds}s`;
+    }
+}
+
 // Initialize app
 async function init() {
     try {
@@ -555,9 +570,9 @@ function renderLanguageStats(data) {
 function renderPerformanceStats(data) {
     // Average processing time
     const avgTime = data.average_processing_time.overall;
-    document.getElementById('avgProcessingTime').textContent = avgTime > 0 ? `${avgTime}ms` : 'N/A';
+    document.getElementById('avgProcessingTime').textContent = formatDuration(avgTime);
     document.getElementById('avgProcessingDetails').textContent =
-        `${t('perf.voice')}: ${data.average_processing_time.voice}ms | ${t('perf.text')}: ${data.average_processing_time.text}ms`;
+        `${t('perf.voice')}: ${formatDuration(data.average_processing_time.voice)} | ${t('perf.text')}: ${formatDuration(data.average_processing_time.text)}`;
 
     // Success rate
     document.getElementById('successRate').textContent = `${data.success_rate}%`;
