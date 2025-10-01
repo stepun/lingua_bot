@@ -119,16 +119,40 @@ def setup_admin_routes(aiohttp_app):
             page = int(request.query.get('page', 1))
             per_page = int(request.query.get('per_page', 10))
 
-            users = await db.get_all_users(limit=per_page, offset=(page-1)*per_page)
+            # Get users directly from database with SQL
+            async with db.get_connection() as conn:
+                cursor = await conn.execute(
+                    """SELECT user_id, username, first_name, last_name,
+                              is_premium, is_blocked, created_at
+                       FROM users
+                       ORDER BY created_at DESC
+                       LIMIT ? OFFSET ?""",
+                    (per_page, (page-1)*per_page)
+                )
+                rows = await cursor.fetchall()
+
+                users = []
+                for row in rows:
+                    users.append({
+                        "id": row[0],
+                        "username": row[1] or "N/A",
+                        "name": f"{row[2] or ''} {row[3] or ''}".strip() or "N/A",
+                        "is_premium": bool(row[4]),
+                        "is_blocked": bool(row[5]),
+                        "created_at": row[6]
+                    })
+
             total = await db.get_user_count()
 
             return web.json_response({
-                "users": [{"id": u.id, "username": u.username, "is_premium": u.is_premium} for u in users],
+                "users": users,
                 "total": total,
                 "page": page,
                 "per_page": per_page
             })
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return web.json_response({"error": str(e)}, status=500)
 
     # Add routes
