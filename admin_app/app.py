@@ -139,7 +139,7 @@ def setup_admin_routes(aiohttp_app):
                         "name": f"{row[2] or ''} {row[3] or ''}".strip() or "N/A",
                         "is_premium": bool(row[4]),
                         "total_translations": row[5] or 0,
-                        "created_at": row[6]
+                        "created_at": str(row[6]) if row[6] else None
                     })
 
             total = await db.get_user_count()
@@ -205,7 +205,7 @@ def setup_admin_routes(aiohttp_app):
                         "target_lang": row[4] or "en",
                         "source_text": row[5][:100] if row[5] else "",  # First 100 chars
                         "translation": row[6][:100] if row[6] else "",
-                        "created_at": row[7],
+                        "created_at": str(row[7]) if row[7] else None,
                         "is_voice": bool(row[8])
                     })
 
