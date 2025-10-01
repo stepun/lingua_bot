@@ -94,6 +94,23 @@ class SQLiteConnection:
         await self.conn.commit()
 
 
+class PostgreSQLCursor:
+    """Cursor-like wrapper for PostgreSQL query results"""
+
+    def __init__(self, conn, query, args):
+        self.conn = conn
+        self.query = query
+        self.args = args
+
+    async def fetchone(self):
+        """Fetch one row"""
+        return await self.conn.fetchrow(self.query, *self.args)
+
+    async def fetchall(self):
+        """Fetch all rows"""
+        return await self.conn.fetch(self.query, *self.args)
+
+
 class PostgreSQLConnection:
     """Wrapper for PostgreSQL connection"""
 
@@ -102,10 +119,11 @@ class PostgreSQLConnection:
         self.is_postgres = True
 
     async def execute(self, query: str, *args):
-        """Execute query"""
+        """Execute query - returns cursor-like object"""
         # Convert ? to $1, $2, etc for PostgreSQL
         pg_query = self._convert_placeholders(query)
-        return await self.conn.execute(pg_query, *args)
+        # Return cursor-like object for compatibility
+        return PostgreSQLCursor(self.conn, pg_query, args)
 
     async def fetchone(self, query: str, *args):
         """Fetch one row"""
