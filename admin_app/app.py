@@ -186,7 +186,7 @@ def setup_admin_routes(aiohttp_app):
 
             async with aiosqlite.connect(db.db_path) as conn:
                 cursor = await conn.execute(
-                    f"""SELECT th.id, th.user_id, u.username, th.source_lang, th.target_lang,
+                    f"""SELECT th.id, th.user_id, u.username, th.source_language, th.target_language,
                                th.source_text, th.basic_translation, th.created_at, th.is_voice
                        FROM translation_history th
                        LEFT JOIN users u ON th.user_id = u.user_id
@@ -203,8 +203,8 @@ def setup_admin_routes(aiohttp_app):
                         "id": row[0],
                         "user_id": row[1],
                         "username": row[2] or "Unknown",
-                        "source_lang": row[3],
-                        "target_lang": row[4],
+                        "source_lang": row[3] or "auto",
+                        "target_lang": row[4] or "en",
                         "source_text": row[5][:100] if row[5] else "",  # First 100 chars
                         "translation": row[6][:100] if row[6] else "",
                         "created_at": row[7],
@@ -239,23 +239,25 @@ def setup_admin_routes(aiohttp_app):
             async with aiosqlite.connect(db.db_path) as conn:
                 # Source languages
                 cursor = await conn.execute(
-                    """SELECT source_lang, COUNT(*) as count
+                    """SELECT source_language, COUNT(*) as count
                        FROM translation_history
-                       GROUP BY source_lang
+                       WHERE source_language IS NOT NULL
+                       GROUP BY source_language
                        ORDER BY count DESC
                        LIMIT 10"""
                 )
-                source_langs = [{"lang": row[0], "count": row[1]} for row in await cursor.fetchall()]
+                source_langs = [{"lang": row[0] or "auto", "count": row[1]} for row in await cursor.fetchall()]
 
                 # Target languages
                 cursor = await conn.execute(
-                    """SELECT target_lang, COUNT(*) as count
+                    """SELECT target_language, COUNT(*) as count
                        FROM translation_history
-                       GROUP BY target_lang
+                       WHERE target_language IS NOT NULL
+                       GROUP BY target_language
                        ORDER BY count DESC
                        LIMIT 10"""
                 )
-                target_langs = [{"lang": row[0], "count": row[1]} for row in await cursor.fetchall()]
+                target_langs = [{"lang": row[0] or "en", "count": row[1]} for row in await cursor.fetchall()]
 
             return web.json_response({
                 "source_languages": source_langs,
