@@ -11,11 +11,8 @@ let currentUser = null;
 
 // Helper: API request with auth
 async function apiRequest(endpoint, options = {}) {
-    const initData = tg.initData;
-
     const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `tma ${initData}`,
         ...options.headers
     };
 
@@ -25,6 +22,8 @@ async function apiRequest(endpoint, options = {}) {
     });
 
     if (!response.ok) {
+        const text = await response.text();
+        console.error('API Error:', response.status, text);
         throw new Error(`API Error: ${response.statusText}`);
     }
 
@@ -67,10 +66,14 @@ async function init() {
     try {
         showLoading();
 
-        // Get current user info
-        currentUser = await apiRequest('/api/me');
-        document.getElementById('userInfo').textContent =
-            `${currentUser.first_name || currentUser.username || 'Admin'}`;
+        // Get current user info from Telegram
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            currentUser = tg.initDataUnsafe.user;
+            document.getElementById('userInfo').textContent =
+                `${currentUser.first_name || currentUser.username || 'Admin'}`;
+        } else {
+            document.getElementById('userInfo').textContent = 'Admin';
+        }
 
         // Set up theme
         document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff');
