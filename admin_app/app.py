@@ -164,10 +164,112 @@ def setup_admin_routes(aiohttp_app):
     aiohttp_app.router.add_get('/static/{filename:.+}', serve_static)
     aiohttp_app.router.add_get('/admin/{filename:.+}', serve_static)
 
+    # Logs endpoints
+    async def get_translation_logs(request):
+        """Get translation logs"""
+        try:
+            check_admin(request)
+
+            from bot.database import db
+            import aiosqlite
+
+            page = int(request.query.get('page', 1))
+            per_page = int(request.query.get('per_page', 20))
+            filter_type = request.query.get('filter', 'all')
+
+            # Build WHERE clause based on filter
+            where_clause = ""
+            if filter_type == "voice":
+                where_clause = "WHERE is_voice = 1"
+            elif filter_type == "text":
+                where_clause = "WHERE is_voice = 0"
+
+            async with aiosqlite.connect(db.db_path) as conn:
+                cursor = await conn.execute(
+                    f"""SELECT th.id, th.user_id, u.username, th.source_lang, th.target_lang,
+                               th.source_text, th.basic_translation, th.created_at, th.is_voice
+                       FROM translation_history th
+                       LEFT JOIN users u ON th.user_id = u.user_id
+                       {where_clause}
+                       ORDER BY th.created_at DESC
+                       LIMIT ? OFFSET ?""",
+                    (per_page, (page-1)*per_page)
+                )
+                rows = await cursor.fetchall()
+
+                logs = []
+                for row in rows:
+                    logs.append({
+                        "id": row[0],
+                        "user_id": row[1],
+                        "username": row[2] or "Unknown",
+                        "source_lang": row[3],
+                        "target_lang": row[4],
+                        "source_text": row[5][:100] if row[5] else "",  # First 100 chars
+                        "translation": row[6][:100] if row[6] else "",
+                        "created_at": row[7],
+                        "is_voice": bool(row[8])
+                    })
+
+                # Get total count
+                cursor = await conn.execute(
+                    f"SELECT COUNT(*) FROM translation_history {where_clause}"
+                )
+                total = (await cursor.fetchone())[0]
+
+            return web.json_response({
+                "logs": logs,
+                "total": total,
+                "page": page,
+                "per_page": per_page
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def get_language_stats(request):
+        """Get language usage statistics"""
+        try:
+            check_admin(request)
+
+            from bot.database import db
+            import aiosqlite
+
+            async with aiosqlite.connect(db.db_path) as conn:
+                # Source languages
+                cursor = await conn.execute(
+                    """SELECT source_lang, COUNT(*) as count
+                       FROM translation_history
+                       GROUP BY source_lang
+                       ORDER BY count DESC
+                       LIMIT 10"""
+                )
+                source_langs = [{"lang": row[0], "count": row[1]} for row in await cursor.fetchall()]
+
+                # Target languages
+                cursor = await conn.execute(
+                    """SELECT target_lang, COUNT(*) as count
+                       FROM translation_history
+                       GROUP BY target_lang
+                       ORDER BY count DESC
+                       LIMIT 10"""
+                )
+                target_langs = [{"lang": row[0], "count": row[1]} for row in await cursor.fetchall()]
+
+            return web.json_response({
+                "source_languages": source_langs,
+                "target_languages": target_langs
+            })
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
     # API routes
     aiohttp_app.router.add_get('/api/stats/', get_stats)
     aiohttp_app.router.add_get('/api/stats/daily', get_daily_stats)
+    aiohttp_app.router.add_get('/api/stats/languages', get_language_stats)
     aiohttp_app.router.add_get('/api/users/', get_users)
+    aiohttp_app.router.add_get('/api/logs/translations', get_translation_logs)
 
     return aiohttp_app
 
