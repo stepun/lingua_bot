@@ -320,14 +320,8 @@ class Database:
             # Get applied migrations
             applied = set()
             try:
-                if db_adapter.is_postgres:
-                    # PostgreSQL: Use fetchall
-                    rows = await conn.fetchall('SELECT version FROM schema_migrations')
-                    applied = {row['version'] for row in rows}
-                else:
-                    # SQLite: Use fetchall with empty tuple
-                    rows = await conn.fetchall('SELECT version FROM schema_migrations', ())
-                    applied = {row[0] for row in rows}
+                rows = await conn.fetchall('SELECT version FROM schema_migrations')
+                applied = {row['version'] for row in rows}
                 print(f"[MIGRATIONS] Already applied: {sorted(applied)}")
             except Exception as e:
                 # Table might not exist yet on first run, that's OK
@@ -344,7 +338,6 @@ class Database:
 
                 print(f"[MIGRATIONS] Applying {version}...")
 
-                migration_success = False
                 try:
                     # Read migration SQL
                     with open(migration_file, 'r', encoding='utf-8') as f:
@@ -353,50 +346,25 @@ class Database:
                     # Execute each statement (split by semicolons, excluding comments)
                     statements = [s.strip() for s in sql.split(';') if s.strip() and not s.strip().startswith('--')]
 
-                    # Use explicit transaction for PostgreSQL (asyncpg requires this for atomic DDL+DML)
-                    if db_adapter.is_postgres:
-                        async with conn.transaction():
-                            # Execute all statements in the migration
-                            for statement in statements:
-                                if statement:
-                                    print(f"[MIGRATIONS]   Executing: {statement[:80]}...")
-                                    await conn.execute(statement)
-
-                            # Mark migration as applied (still in same transaction)
-                            await conn.execute(
-                                'INSERT INTO schema_migrations (version) VALUES ($1)',
-                                version
-                            )
-                            # Transaction commits automatically on exit
-                    else:
-                        # SQLite: use manual BEGIN/COMMIT
-                        await conn.execute("BEGIN")
-
+                    # Use explicit transaction (asyncpg requires this for atomic DDL+DML)
+                    async with conn.transaction():
                         # Execute all statements in the migration
                         for statement in statements:
                             if statement:
+                                print(f"[MIGRATIONS]   Executing: {statement[:80]}...")
                                 await conn.execute(statement)
 
-                        # Mark migration as applied
+                        # Mark migration as applied (still in same transaction)
                         await conn.execute(
-                            'INSERT INTO schema_migrations (version) VALUES (?)',
-                            (version,)
+                            'INSERT INTO schema_migrations (version) VALUES ($1)',
+                            version
                         )
+                        # Transaction commits automatically on exit
 
-                        await conn.commit()
-
-                    migration_success = True
                     print(f"[MIGRATIONS] ✅ Applied {version}")
 
                 except Exception as e:
                     print(f"[MIGRATIONS] ❌ Failed to apply {version}: {e}")
-
-                    # ROLLBACK on error - neither DDL nor INSERT will be saved
-                    try:
-                        if not db_adapter.is_postgres:
-                            await conn.execute("ROLLBACK")
-                    except:
-                        pass
 
                     # Check if this is a "duplicate key" error (migration already recorded but failed)
                     error_str = str(e).lower()
@@ -405,7 +373,6 @@ class Database:
                         print(f"[MIGRATIONS] ⚠️  Please verify schema manually or run fix script")
 
                     # Do NOT continue - stop on first error to prevent cascading failures
-                    # In production, you want to know immediately if a migration failed
                     raise RuntimeError(f"Migration {version} failed: {e}")
 
     async def verify_and_repair_schema(self):
