@@ -124,7 +124,7 @@ def setup_admin_routes(aiohttp_app):
             async with aiosqlite.connect(db.db_path) as conn:
                 cursor = await conn.execute(
                     """SELECT user_id, username, first_name, last_name,
-                              is_premium, is_blocked, created_at
+                              is_premium, total_translations, created_at
                        FROM users
                        ORDER BY created_at DESC
                        LIMIT ? OFFSET ?""",
@@ -139,7 +139,7 @@ def setup_admin_routes(aiohttp_app):
                         "username": row[1] or "N/A",
                         "name": f"{row[2] or ''} {row[3] or ''}".strip() or "N/A",
                         "is_premium": bool(row[4]),
-                        "is_blocked": bool(row[5]),
+                        "total_translations": row[5] or 0,
                         "created_at": row[6]
                     })
 
