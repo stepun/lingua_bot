@@ -62,10 +62,20 @@ def start_postgres():
 
 def setup_env():
     """Настройка переменных окружения для локальной разработки"""
-    os.environ["DATABASE_URL"] = "postgresql://linguabot:devpassword123@localhost:5433/linguabot"
-    os.environ["PORT"] = "0"  # Polling mode для локальной разработки
+    # Загружаем .env.local если существует
+    env_local = ".env.local"
+    if os.path.exists(env_local):
+        print(f"📝 Loading {env_local}...")
+        from dotenv import load_dotenv
+        load_dotenv(env_local, override=True)
+    else:
+        # Устанавливаем минимальные переменные
+        os.environ["DATABASE_URL"] = "postgresql://linguabot:devpassword123@localhost:5433/linguabot"
+        os.environ["PORT"] = "0"  # Polling mode
+
     print("✅ Environment configured")
-    print(f"   DATABASE_URL: {os.environ['DATABASE_URL']}")
+    print(f"   DATABASE_URL: {os.environ.get('DATABASE_URL', 'not set')}")
+    print(f"   BOT_TOKEN: {os.environ.get('BOT_TOKEN', 'not set')[:20]}...")
 
 def run_bot():
     """Запуск бота"""
