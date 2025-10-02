@@ -379,6 +379,23 @@ All handlers use `check_admin_with_permission()` for authorization and re-raise 
      - `main.py` - Bot entry point
      - `config.py` - Configuration management
      - Files in `bot/` directory - core bot functionality
+8. **PostgreSQL datetime handling - "'datetime.datetime' object is not subscriptable"**:
+   - **Symptom**: Errors in export (PDF/TXT), history display: `TypeError: 'datetime.datetime' object is not subscriptable`
+   - **Cause**: PostgreSQL returns `created_at` as `datetime.datetime` object, not string. Code using string slicing like `item['created_at'][:19]` fails
+   - **Solution**: Always check type before string operations:
+     ```python
+     from datetime import datetime
+     created_at = item['created_at']
+     if isinstance(created_at, datetime):
+         date_str = created_at.strftime('%Y-%m-%d %H:%M:%S')
+     else:
+         date_str = created_at[:19]  # Fallback for string format
+     ```
+   - **Affected files**:
+     - `bot/services/export.py` - PDF/TXT generation (lines 150-159, 172-184, 267-277, 291-302)
+     - `bot/handlers/export.py` - Export handlers (lines 58-70, 128-140)
+     - `bot/handlers/callbacks.py` - History display (lines 311-321)
+   - **Prevention**: Always use `isinstance(value, datetime)` when working with database date fields
 
 ## Database Migrations System
 

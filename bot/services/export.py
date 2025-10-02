@@ -148,7 +148,12 @@ class ExportService:
                 # Group by date
                 translations_by_date = {}
                 for item in history:
-                    date_str = item['created_at'][:10]  # Get date part
+                    # Handle both datetime objects and strings
+                    created_at = item['created_at']
+                    if isinstance(created_at, datetime):
+                        date_str = created_at.strftime('%Y-%m-%d')
+                    else:
+                        date_str = created_at[:10]  # Get date part
                     if date_str not in translations_by_date:
                         translations_by_date[date_str] = []
                     translations_by_date[date_str].append(item)
@@ -170,7 +175,12 @@ class ExportService:
                         translated_text = item['translated_text']
                         source_lang = config.SUPPORTED_LANGUAGES.get(item.get('source_language', ''), item.get('source_language', ''))
                         target_lang = config.SUPPORTED_LANGUAGES.get(item.get('target_language', ''), item.get('target_language', ''))
-                        time_str = item['created_at'][11:16]  # Get time part
+                        # Handle both datetime objects and strings
+                        created_at = item['created_at']
+                        if isinstance(created_at, datetime):
+                            time_str = created_at.strftime('%H:%M')
+                        else:
+                            time_str = created_at[11:16]  # Get time part
                         voice_icon = "🎤 " if item.get('is_voice', False) else ""
 
                         translation_text = f"""
@@ -256,7 +266,12 @@ class ExportService:
                 # Group by date
                 translations_by_date = {}
                 for item in history:
-                    date_str = item['created_at'][:10]
+                    # Handle both datetime objects and strings
+                    created_at = item['created_at']
+                    if isinstance(created_at, datetime):
+                        date_str = created_at.strftime('%Y-%m-%d')
+                    else:
+                        date_str = created_at[:10]
                     if date_str not in translations_by_date:
                         translations_by_date[date_str] = []
                     translations_by_date[date_str].append(item)
@@ -278,7 +293,12 @@ class ExportService:
                         translated_text = item['translated_text']
                         source_lang = config.SUPPORTED_LANGUAGES.get(item.get('source_language', ''), item.get('source_language', ''))
                         target_lang = config.SUPPORTED_LANGUAGES.get(item.get('target_language', ''), item.get('target_language', ''))
-                        time_str = item['created_at'][11:16]
+                        # Handle both datetime objects and strings
+                        created_at = item['created_at']
+                        if isinstance(created_at, datetime):
+                            time_str = created_at.strftime('%H:%M')
+                        else:
+                            time_str = created_at[11:16]
                         voice_icon = "🎤 " if item.get('is_voice', False) else ""
 
                         content.append(f"{voice_icon}🔸 {source_lang} → {target_lang} ({time_str})")

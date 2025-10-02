@@ -55,11 +55,17 @@ async def export_pdf_handler(callback: CallbackQuery):
         pdf_file = BufferedInputFile(pdf_data, filename=filename)
 
         # Send PDF file
+        from datetime import datetime
+        first_date = history[0]['created_at']
+        last_date = history[-1]['created_at']
+        first_date_str = first_date.strftime('%Y-%m-%d') if isinstance(first_date, datetime) else first_date[:10]
+        last_date_str = last_date.strftime('%Y-%m-%d') if isinstance(last_date, datetime) else last_date[:10]
+
         await callback.message.answer_document(
             pdf_file,
             caption=f"📚 Ваш персональный разговорник\n\n"
                    f"📊 Переводов: {len(history)}\n"
-                   f"📅 Создан: {history[0]['created_at'][:10]} - {history[-1]['created_at'][:10]}\n\n"
+                   f"📅 Создан: {first_date_str} - {last_date_str}\n\n"
                    f"💡 Используйте этот файл для изучения языков в оффлайне!"
         )
 
@@ -119,11 +125,17 @@ async def export_txt_handler(callback: CallbackQuery):
         txt_file = BufferedInputFile(txt_data, filename=filename)
 
         # Send TXT file
+        from datetime import datetime
+        first_date = history[0]['created_at']
+        last_date = history[-1]['created_at']
+        first_date_str = first_date.strftime('%Y-%m-%d') if isinstance(first_date, datetime) else first_date[:10]
+        last_date_str = last_date.strftime('%Y-%m-%d') if isinstance(last_date, datetime) else last_date[:10]
+
         await callback.message.answer_document(
             txt_file,
             caption=f"📝 Ваш разговорник в текстовом формате\n\n"
                    f"📊 Переводов: {len(history)}\n"
-                   f"📅 Создан: {history[0]['created_at'][:10]} - {history[-1]['created_at'][:10]}\n\n"
+                   f"📅 Создан: {first_date_str} - {last_date_str}\n\n"
                    f"💡 Простой формат для чтения в любом текстовом редакторе!"
         )
 

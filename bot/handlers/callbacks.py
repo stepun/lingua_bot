@@ -308,10 +308,17 @@ async def history_handler(callback: CallbackQuery):
 
     text = get_text('history_header', user_info.get('interface_language', 'ru')) + "\n\n"
 
+    from datetime import datetime
     for item in history:
         text += f"🔸 {item['source_text'][:50]}{'...' if len(item['source_text']) > 50 else ''}\n"
         text += f"   → {item['translated_text'][:50]}{'...' if len(item['translated_text']) > 50 else ''}\n"
-        text += f"   📅 {item['created_at'][:19]}\n\n"
+        # Handle both datetime objects and strings
+        created_at = item['created_at']
+        if isinstance(created_at, datetime):
+            date_str = created_at.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            date_str = created_at[:19]
+        text += f"   📅 {date_str}\n\n"
 
     await callback.message.edit_text(text, reply_markup=get_history_keyboard())
     await callback.answer()
