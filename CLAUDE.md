@@ -304,20 +304,46 @@ Admins can send messages directly to users through the admin panel:
 - Validates admin permissions via Telegram WebApp authentication
 - Logs action with first 100 chars of message
 
-### Access Control
+### Access Control & Role-Based Permissions
 
-- Authentication via Telegram WebApp initData with HMAC validation
-- Admin IDs configured in `ADMIN_IDS` environment variable
-- All API endpoints check admin access via `check_admin(request)` helper
-- Returns admin user_id for logging purposes
+**Authentication:**
+- Telegram WebApp initData with HMAC validation
+- Dual-mode: Database-first (admin_roles table) with ADMIN_IDS fallback
+
+**Role System (RBAC):**
+- **Admin** - Full access to all features (`*` permission)
+- **Moderator** - User management, logs, feedback (view_users, block_user, view_logs, etc.)
+- **Analyst** - Read-only statistics (view_dashboard, view_stats only)
+
+**Permission Checking:**
+- `check_admin_with_permission(request, 'permission_name')` - Returns (user_id, role, permissions)
+- Database role takes precedence over ADMIN_IDS
+- All endpoints protected with specific permission requirements
+- HTTP 403 for insufficient permissions (re-raised before generic Exception catch)
+
+**Bot Integration:**
+- `check_admin_role(user_id)` in bot/middlewares/admin.py
+- All admin commands (/admin_panel, /admin, etc.) use async role checking
+- Fallback to ADMIN_IDS for backward compatibility
 
 ### File Structure
 
-- `admin_app/app.py` - Main aiohttp app, API endpoints
-- `admin_app/auth.py` - Telegram WebApp authentication
+**Core Application:**
+- `admin_app/app.py` - Route registration and static file serving
+- `admin_app/auth.py` - Telegram WebApp authentication and role permissions
 - `admin_app/static/index.html` - Single-page application UI
-- `admin_app/static/app.js` - Frontend logic, API calls, translations
+- `admin_app/static/app.js` - Frontend logic, API calls, i18n translations
 - `admin_app/static/style.css` - Legacy styles (most use Tailwind inline)
+
+**Modular Handlers (admin_app/handlers/):**
+- `stats.py` - Statistics endpoints (overall, daily, languages, performance)
+- `users.py` - User management (list, block/unblock, premium, messages, history)
+- `logs.py` - Translation logs
+- `feedback.py` - User feedback management
+- `admin_logs.py` - Admin action logs
+- `roles.py` - Role management (assign, remove, list)
+
+All handlers use `check_admin_with_permission()` for authorization and re-raise HTTPException before catching generic errors.
 
 ## Common Issues
 
