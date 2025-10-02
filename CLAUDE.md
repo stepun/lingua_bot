@@ -110,9 +110,10 @@ Optional but recommended:
 
 ### Payment System
 - YooKassa and Telegram native payments in `bot/services/payment.py`
-- Webhook handling in `bot/handlers/payments.py`
+- Webhook handling in `bot/handlers/payments.py` and `webhook.py` (YooKassa callbacks)
 - Subscription management in database layer
 - Receipt generation for fiscal compliance (provider_data)
+- ⚠️ **Critical**: `webhook.py` is required for YooKassa payment processing in production
 
 ## Docker Architecture
 
@@ -164,6 +165,7 @@ All local development scripts are located in `.scripts/` directory (excluded fro
 **Production Scripts (in root):**
 - `main.py` - Main bot entry point
 - `config.py` - Configuration management
+- `webhook.py` - YooKassa payment webhook handler ⚠️ **Required for production**
 - `install_beget.sh` - Install bot on Beget server
 - `start_beget.sh` - Start bot on Beget
 - `stop_beget.sh` - Stop bot on Beget
@@ -255,6 +257,16 @@ Voice handlers have strict data isolation:
      docker network inspect linguabot_dev_network --format '{{range $key, $value := .Containers}}{{$value.Name}}{{"\n"}}{{end}}'
      # Should show both: linguabot_postgres_dev and linguabot_dev
      ```
+7. **"No module named 'webhook'" error on Railway**:
+   - **Symptom**: Bot crashes with `ModuleNotFoundError: No module named 'webhook'`
+   - **Cause**: `webhook.py` file was accidentally deleted during cleanup
+   - **Fix**: Restore `webhook.py` from git history or backup - it's required for YooKassa payment processing
+   - **Prevention**: Never delete these production-critical files:
+     - `webhook.py` - YooKassa payment webhook handler
+     - `main.py` - Bot entry point
+     - `config.py` - Configuration management
+     - Files in `bot/` directory - core bot functionality
+
 ## Database Migrations System
 
 The project uses a custom versioned migrations system to prevent schema inconsistencies.
