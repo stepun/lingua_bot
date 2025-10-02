@@ -706,7 +706,7 @@ async function grantPremium(userId) {
         showLoading();
         await apiRequest(`/api/users/${userId}/premium`, { method: 'POST' });
         hideLoading();
-        tg.showAlert('Premium granted for 30 days!');
+        tg.showAlert('Premium granted for 1 day!');
         loadUsers(currentPage);
     } catch (error) {
         hideLoading();

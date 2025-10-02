@@ -1,5 +1,4 @@
 import asyncio
-import aiosqlite
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -10,8 +9,7 @@ from bot.db_adapter import db_adapter
 class Database:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or config.DATABASE_PATH
-        if not db_adapter.is_postgres:
-            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        # PostgreSQL-only system, no local path needed
 
     async def init(self):
         """Initialize database tables"""
@@ -20,272 +18,128 @@ class Database:
             bool_type = db_adapter.get_boolean_type()
             ts_type = db_adapter.get_timestamp_type()
 
-            # Users table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS users (
-                        user_id BIGINT PRIMARY KEY,
-                        username TEXT,
-                        first_name TEXT,
-                        last_name TEXT,
-                        language_code TEXT DEFAULT 'ru',
-                        interface_language TEXT DEFAULT 'ru',
-                        target_language TEXT DEFAULT 'en',
-                        translation_style TEXT DEFAULT 'informal',
-                        is_premium {bool_type} DEFAULT FALSE,
-                        is_blocked {bool_type} DEFAULT FALSE,
-                        premium_until {ts_type},
-                        free_translations_today INTEGER DEFAULT 0,
-                        last_translation_date DATE,
-                        total_translations INTEGER DEFAULT 0,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS users (
-                        user_id INTEGER PRIMARY KEY,
-                        username TEXT,
-                        first_name TEXT,
-                        last_name TEXT,
-                        language_code TEXT DEFAULT 'ru',
-                        interface_language TEXT DEFAULT 'ru',
-                        target_language TEXT DEFAULT 'en',
-                        translation_style TEXT DEFAULT 'informal',
-                        is_premium {bool_type} DEFAULT 0,
-                        is_blocked {bool_type} DEFAULT 0,
-                        premium_until {ts_type},
-                        free_translations_today INTEGER DEFAULT 0,
-                        last_translation_date DATE,
-                        total_translations INTEGER DEFAULT 0,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
+            # Users table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id BIGINT PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    language_code TEXT DEFAULT 'ru',
+                    interface_language TEXT DEFAULT 'ru',
+                    target_language TEXT DEFAULT 'en',
+                    translation_style TEXT DEFAULT 'informal',
+                    is_blocked {bool_type} DEFAULT FALSE,
+                    free_translations_today INTEGER DEFAULT 0,
+                    last_translation_date DATE,
+                    total_translations INTEGER DEFAULT 0,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
-            # Translation history table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS translation_history (
-                        id {serial_type},
-                        user_id BIGINT,
-                        source_text TEXT,
-                        source_language TEXT,
-                        translated_text TEXT,
-                        basic_translation TEXT,
-                        enhanced_translation TEXT,
-                        alternatives TEXT,
-                        target_language TEXT,
-                        translation_style TEXT,
-                        is_voice {bool_type} DEFAULT FALSE,
-                        processing_time_ms INTEGER,
-                        status TEXT DEFAULT 'success',
-                        error_message TEXT,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS translation_history (
-                        id {serial_type},
-                        user_id INTEGER,
-                        source_text TEXT,
-                        source_language TEXT,
-                        translated_text TEXT,
-                        basic_translation TEXT,
-                        enhanced_translation TEXT,
-                        alternatives TEXT,
-                        target_language TEXT,
-                        translation_style TEXT,
-                        is_voice {bool_type} DEFAULT 0,
-                        processing_time_ms INTEGER,
-                        status TEXT DEFAULT 'success',
-                        error_message TEXT,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
+            # Translation history table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS translation_history (
+                    id {serial_type},
+                    user_id BIGINT,
+                    source_text TEXT,
+                    source_language TEXT,
+                    translated_text TEXT,
+                    basic_translation TEXT,
+                    enhanced_translation TEXT,
+                    alternatives TEXT,
+                    target_language TEXT,
+                    translation_style TEXT,
+                    is_voice {bool_type} DEFAULT FALSE,
+                    processing_time_ms INTEGER,
+                    status TEXT DEFAULT 'success',
+                    error_message TEXT,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
 
-            # Subscriptions table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS subscriptions (
-                        id {serial_type},
-                        user_id BIGINT,
-                        subscription_type TEXT,
-                        amount REAL,
-                        currency TEXT DEFAULT 'RUB',
-                        payment_id TEXT,
-                        status TEXT,
-                        started_at {ts_type},
-                        expires_at {ts_type},
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS subscriptions (
-                        id {serial_type},
-                        user_id INTEGER,
-                        subscription_type TEXT,
-                        amount REAL,
-                        currency TEXT DEFAULT 'RUB',
-                        payment_id TEXT,
-                        status TEXT,
-                        started_at {ts_type},
-                        expires_at {ts_type},
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
+            # Subscriptions table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id {serial_type},
+                    user_id BIGINT,
+                    subscription_type TEXT,
+                    amount REAL,
+                    currency TEXT DEFAULT 'RUB',
+                    payment_id TEXT,
+                    status TEXT,
+                    started_at {ts_type},
+                    expires_at {ts_type},
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
 
-            # User settings table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS user_settings (
-                        user_id BIGINT PRIMARY KEY,
-                        auto_voice {bool_type} DEFAULT FALSE,
-                        save_history {bool_type} DEFAULT TRUE,
-                        notifications_enabled {bool_type} DEFAULT TRUE,
-                        voice_speed REAL DEFAULT 1.0,
-                        voice_type TEXT DEFAULT 'alloy',
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS user_settings (
-                        user_id INTEGER PRIMARY KEY,
-                        auto_voice {bool_type} DEFAULT 0,
-                        save_history {bool_type} DEFAULT 1,
-                        notifications_enabled {bool_type} DEFAULT 1,
-                        voice_speed REAL DEFAULT 1.0,
-                        voice_type TEXT DEFAULT 'alloy',
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
+            # User settings table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    user_id BIGINT PRIMARY KEY,
+                    auto_voice {bool_type} DEFAULT FALSE,
+                    save_history {bool_type} DEFAULT TRUE,
+                    notifications_enabled {bool_type} DEFAULT TRUE,
+                    voice_speed REAL DEFAULT 1.0,
+                    voice_type TEXT DEFAULT 'alloy',
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
 
-            # Statistics table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS statistics (
-                        id {serial_type},
-                        date DATE UNIQUE,
-                        total_users INTEGER DEFAULT 0,
-                        active_users INTEGER DEFAULT 0,
-                        premium_users INTEGER DEFAULT 0,
-                        total_translations INTEGER DEFAULT 0,
-                        voice_translations INTEGER DEFAULT 0,
-                        revenue REAL DEFAULT 0
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS statistics (
-                        id {serial_type},
-                        date DATE UNIQUE,
-                        total_users INTEGER DEFAULT 0,
-                        active_users INTEGER DEFAULT 0,
-                        premium_users INTEGER DEFAULT 0,
-                        total_translations INTEGER DEFAULT 0,
-                        voice_translations INTEGER DEFAULT 0,
-                        revenue REAL DEFAULT 0
-                    )
-                ''')
+            # Statistics table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS statistics (
+                    id {serial_type},
+                    date DATE UNIQUE,
+                    total_users INTEGER DEFAULT 0,
+                    active_users INTEGER DEFAULT 0,
+                    premium_users INTEGER DEFAULT 0,
+                    total_translations INTEGER DEFAULT 0,
+                    voice_translations INTEGER DEFAULT 0,
+                    revenue REAL DEFAULT 0
+                )
+            ''')
 
-            # Feedback table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS feedback (
-                        id {serial_type},
-                        user_id BIGINT,
-                        message TEXT NOT NULL,
-                        status TEXT DEFAULT 'new',
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS feedback (
-                        id {serial_type},
-                        user_id INTEGER,
-                        message TEXT NOT NULL,
-                        status TEXT DEFAULT 'new',
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    )
-                ''')
+            # Feedback table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id {serial_type},
+                    user_id BIGINT,
+                    message TEXT NOT NULL,
+                    status TEXT DEFAULT 'new',
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
 
-            # Admin actions table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS admin_actions (
-                        id {serial_type},
-                        admin_user_id BIGINT NOT NULL,
-                        action TEXT NOT NULL,
-                        target_user_id BIGINT,
-                        details TEXT,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (admin_user_id) REFERENCES users (user_id),
-                        FOREIGN KEY (target_user_id) REFERENCES users (user_id)
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS admin_actions (
-                        id {serial_type},
-                        admin_user_id INTEGER NOT NULL,
-                        action TEXT NOT NULL,
-                        target_user_id INTEGER,
-                        details TEXT,
-                        created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (admin_user_id) REFERENCES users (user_id),
-                        FOREIGN KEY (target_user_id) REFERENCES users (user_id)
-                    )
-                ''')
+            # Admin actions table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS admin_actions (
+                    id {serial_type},
+                    admin_user_id BIGINT NOT NULL,
+                    action TEXT NOT NULL,
+                    target_user_id BIGINT,
+                    details TEXT,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (admin_user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (target_user_id) REFERENCES users (user_id)
+                )
+            ''')
 
-            # Schema migrations table
-            if db_adapter.is_postgres:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS schema_migrations (
-                        version TEXT PRIMARY KEY,
-                        applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-            else:
-                await conn.execute(f'''
-                    CREATE TABLE IF NOT EXISTS schema_migrations (
-                        version TEXT PRIMARY KEY,
-                        applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-
-            # Migration: Add new columns if they don't exist (only for SQLite)
-            if not db_adapter.is_postgres:
-                try:
-                    await conn.execute('ALTER TABLE translation_history ADD COLUMN basic_translation TEXT')
-                except:
-                    pass  # Column already exists
-
-                try:
-                    await conn.execute('ALTER TABLE translation_history ADD COLUMN enhanced_translation TEXT')
-                except:
-                    pass  # Column already exists
-
-                try:
-                    await conn.execute('ALTER TABLE translation_history ADD COLUMN alternatives TEXT')
-                except:
-                    pass  # Column already exists
+            # Schema migrations table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version TEXT PRIMARY KEY,
+                    applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
             await conn.commit()
 
@@ -385,6 +239,7 @@ class Database:
         """
         Verify schema integrity and repair if migrations were marked as applied
         but columns are missing (due to previous transaction issues)
+        PostgreSQL-only system.
         """
         print("[SCHEMA_REPAIR] Verifying schema integrity...")
 
@@ -393,37 +248,35 @@ class Database:
 
             # Check 001_add_is_blocked.sql - users.is_blocked
             try:
-                if db_adapter.is_postgres:
-                    row = await conn.fetchone("""
-                        SELECT column_name
-                        FROM information_schema.columns
-                        WHERE table_name = 'users' AND column_name = 'is_blocked'
-                    """)
-                    if not row:
-                        print("[SCHEMA_REPAIR] ⚠️  Column users.is_blocked missing, repairing...")
-                        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE")
-                        repairs_made.append("users.is_blocked")
-                        print("[SCHEMA_REPAIR] ✅ Repaired users.is_blocked")
+                row = await conn.fetchone("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'is_blocked'
+                """)
+                if not row:
+                    print("[SCHEMA_REPAIR] ⚠️  Column users.is_blocked missing, repairing...")
+                    await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE")
+                    repairs_made.append("users.is_blocked")
+                    print("[SCHEMA_REPAIR] ✅ Repaired users.is_blocked")
             except Exception as e:
                 print(f"[SCHEMA_REPAIR] Error checking users.is_blocked: {e}")
 
             # Check 002_add_performance_metrics.sql - translation_history columns
             try:
-                if db_adapter.is_postgres:
-                    row = await conn.fetchone("""
-                        SELECT COUNT(*) as cnt
-                        FROM information_schema.columns
-                        WHERE table_name = 'translation_history'
-                        AND column_name IN ('processing_time_ms', 'status', 'error_message')
-                    """)
-                    missing_count = 3 - (row['cnt'] if row else 0)
-                    if missing_count > 0:
-                        print(f"[SCHEMA_REPAIR] ⚠️  Missing {missing_count} translation_history columns, repairing...")
-                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS processing_time_ms INTEGER")
-                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'success'")
-                        await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS error_message TEXT")
-                        repairs_made.append("translation_history.performance_metrics")
-                        print("[SCHEMA_REPAIR] ✅ Repaired translation_history performance columns")
+                row = await conn.fetchone("""
+                    SELECT COUNT(*) as cnt
+                    FROM information_schema.columns
+                    WHERE table_name = 'translation_history'
+                    AND column_name IN ('processing_time_ms', 'status', 'error_message')
+                """)
+                missing_count = 3 - (row['cnt'] if row else 0)
+                if missing_count > 0:
+                    print(f"[SCHEMA_REPAIR] ⚠️  Missing {missing_count} translation_history columns, repairing...")
+                    await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS processing_time_ms INTEGER")
+                    await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'success'")
+                    await conn.execute("ALTER TABLE translation_history ADD COLUMN IF NOT EXISTS error_message TEXT")
+                    repairs_made.append("translation_history.performance_metrics")
+                    print("[SCHEMA_REPAIR] ✅ Repaired translation_history performance columns")
             except Exception as e:
                 print(f"[SCHEMA_REPAIR] Error checking translation_history: {e}")
 
@@ -436,89 +289,34 @@ class Database:
     async def add_user(self, user_id: int, username: str = None, first_name: str = None,
                       last_name: str = None, language_code: str = 'ru') -> bool:
         """Add new user or update existing"""
-        from config import config
-
-        # Check if user is admin
-        is_admin = user_id in config.ADMIN_IDS
-
         async with db_adapter.get_connection() as conn:
             # Check if user exists
-            existing_user = await conn.fetchone('SELECT user_id, target_language, is_premium, premium_until FROM users WHERE user_id = ?', user_id)
+            existing_user = await conn.fetchone('SELECT user_id, target_language FROM users WHERE user_id = ?', user_id)
 
             if existing_user:
-                # User exists - update and check subscription expiry
-                if is_admin:
-                    # Admin - always premium
-                    premium_status = True
-                    premium_until = datetime.now() + timedelta(days=36500)  # 100 years for admin
-                    await conn.execute('''
-                        UPDATE users SET
-                            username = ?, first_name = ?, last_name = ?, language_code = ?,
-                            interface_language = ?, is_premium = ?, premium_until = ?, updated_at = ?
-                        WHERE user_id = ?
-                    ''', username, first_name, last_name, language_code,
-                         language_code, premium_status, premium_until, datetime.now(), user_id)
-                else:
-                    # Regular user - check if subscription expired
-                    current_premium_until = existing_user[3]  # premium_until from SELECT
-
-                    # Check if subscription is expired
-                    now = datetime.now()
-                    subscription_expired = False
-                    if current_premium_until:
-                        try:
-                            # Parse premium_until (can be string or datetime)
-                            if isinstance(current_premium_until, str):
-                                premium_until_dt = datetime.fromisoformat(current_premium_until.replace('Z', '+00:00'))
-                            else:
-                                premium_until_dt = current_premium_until
-
-                            subscription_expired = premium_until_dt <= now
-                        except:
-                            subscription_expired = True
-
-                    if subscription_expired:
-                        # Reset to non-premium
-                        premium_false = "FALSE" if db_adapter.is_postgres else "0"
-                        await conn.execute(f'''
-                            UPDATE users SET
-                                username = ?, first_name = ?, last_name = ?, language_code = ?,
-                                interface_language = ?, is_premium = {premium_false}, premium_until = NULL, updated_at = ?
-                            WHERE user_id = ?
-                        ''', username, first_name, last_name, language_code,
-                             language_code, datetime.now(), user_id)
-                    else:
-                        # Don't change premium status if not expired
-                        await conn.execute('''
-                            UPDATE users SET
-                                username = ?, first_name = ?, last_name = ?, language_code = ?,
-                                interface_language = ?, updated_at = ?
-                            WHERE user_id = ?
-                        ''', username, first_name, last_name, language_code,
-                             language_code, datetime.now(), user_id)
+                # User exists - update basic info only
+                await conn.execute('''
+                    UPDATE users SET
+                        username = ?, first_name = ?, last_name = ?, language_code = ?,
+                        interface_language = ?, updated_at = ?
+                    WHERE user_id = ?
+                ''', username, first_name, last_name, language_code,
+                     language_code, datetime.now(), user_id)
             else:
                 # New user - insert with default values
-                premium_status = is_admin
-                premium_until = datetime.now() + timedelta(days=36500) if is_admin else None
-
                 await conn.execute('''
                     INSERT INTO users (
                         user_id, username, first_name, last_name, language_code,
-                        interface_language, target_language, is_premium, premium_until, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        interface_language, target_language, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ''', user_id, username, first_name, last_name, language_code,
-                     language_code, 'en', premium_status, premium_until, datetime.now())
+                     language_code, 'en', datetime.now())
 
-            # Initialize user settings (use UPSERT for PostgreSQL compatibility)
-            if db_adapter.is_postgres:
-                await conn.execute('''
-                    INSERT INTO user_settings (user_id) VALUES (?)
-                    ON CONFLICT (user_id) DO NOTHING
-                ''', user_id)
-            else:
-                await conn.execute('''
-                    INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)
-                ''', user_id)
+            # Initialize user settings (PostgreSQL UPSERT)
+            await conn.execute('''
+                INSERT INTO user_settings (user_id) VALUES (?)
+                ON CONFLICT (user_id) DO NOTHING
+            ''', user_id)
 
             await conn.commit()
             return True
@@ -540,11 +338,12 @@ class Database:
             user_data = dict(row)
 
             # Add dynamic premium status from subscriptions table
-            subscription = await conn.fetchone('''
+            cursor_sub = await conn.execute('''
                 SELECT expires_at FROM subscriptions
                 WHERE user_id = ? AND status = 'active' AND expires_at > ?
                 ORDER BY expires_at DESC LIMIT 1
             ''', user_id, datetime.now())
+            subscription = await cursor_sub.fetchone()
 
             user_data['is_premium'] = subscription is not None
             user_data['premium_until'] = subscription['expires_at'] if subscription else None
@@ -577,8 +376,7 @@ class Database:
         """Check if user has reached daily translation limit"""
         async with db_adapter.get_connection() as conn:
             cursor = await conn.execute('''
-                SELECT is_premium, free_translations_today, last_translation_date,
-                       premium_until
+                SELECT free_translations_today, last_translation_date
                 FROM users WHERE user_id = ?
             ''', user_id)
             row = await cursor.fetchone()
@@ -586,19 +384,17 @@ class Database:
             if not row:
                 return False, 0
 
-            is_premium, translations_today, last_date, premium_until = row
+            translations_today, last_date = row
 
-            # Check if premium is still valid
-            if is_premium and premium_until:
-                premium_until = datetime.fromisoformat(premium_until)
-                if premium_until < datetime.now():
-                    # Premium expired
-                    premium_false = "FALSE" if db_adapter.is_postgres else "0"
-                    await conn.execute(f'''
-                        UPDATE users SET is_premium = {premium_false} WHERE user_id = ?
-                    ''', user_id)
-                    await conn.commit()
-                    is_premium = False
+            # Check if user has active premium subscription
+            cursor_sub = await conn.execute('''
+                SELECT expires_at FROM subscriptions
+                WHERE user_id = ? AND status = 'active' AND expires_at > ?
+                ORDER BY expires_at DESC LIMIT 1
+            ''', user_id, datetime.now())
+            subscription = await cursor_sub.fetchone()
+
+            is_premium = subscription is not None
 
             # Premium users have unlimited translations
             if is_premium:
@@ -728,14 +524,6 @@ class Database:
             ''', user_id, subscription_type, amount, payment_id,
                  'active', now, expires_at)
 
-            # Update user premium status
-            premium_value = "TRUE" if db_adapter.is_postgres else "1"
-            await conn.execute(f'''
-                UPDATE users
-                SET is_premium = {premium_value}, premium_until = ?
-                WHERE user_id = ?
-            ''', expires_at, user_id)
-
             await conn.commit()
             return True
 
@@ -745,25 +533,28 @@ class Database:
             date = datetime.now().date()
 
         async with db_adapter.get_connection() as conn:
-            # Build boolean comparison based on database type
-            premium_check = "is_premium = TRUE" if db_adapter.is_postgres else "is_premium = 1"
-            voice_check = "is_voice = TRUE" if db_adapter.is_postgres else "is_voice = 1"
-
             # Get user statistics
-            cursor = await conn.execute(f'''
+            cursor = await conn.execute('''
                 SELECT
                     COUNT(*) as total_users,
-                    SUM(CASE WHEN last_translation_date = ? THEN 1 ELSE 0 END) as active_users,
-                    SUM(CASE WHEN {premium_check} THEN 1 ELSE 0 END) as premium_users
+                    SUM(CASE WHEN last_translation_date = ? THEN 1 ELSE 0 END) as active_users
                 FROM users
             ''', date)
             user_stats = await cursor.fetchone()
 
+            # Get premium user count from active subscriptions
+            cursor = await conn.execute('''
+                SELECT COUNT(DISTINCT user_id) as premium_users
+                FROM subscriptions
+                WHERE status = 'active' AND expires_at > ?
+            ''', datetime.now())
+            premium_stats = await cursor.fetchone()
+
             # Get translation statistics
-            cursor = await conn.execute(f'''
+            cursor = await conn.execute('''
                 SELECT
                     COUNT(*) as total_translations,
-                    SUM(CASE WHEN {voice_check} THEN 1 ELSE 0 END) as voice_translations
+                    SUM(CASE WHEN is_voice = TRUE THEN 1 ELSE 0 END) as voice_translations
                 FROM translation_history
                 WHERE DATE(created_at) = ?
             ''', date)
@@ -781,7 +572,7 @@ class Database:
                 'date': date,
                 'total_users': user_stats[0] or 0,
                 'active_users': user_stats[1] or 0,
-                'premium_users': user_stats[2] or 0,
+                'premium_users': premium_stats[0] or 0,
                 'total_translations': trans_stats[0] or 0,
                 'voice_translations': trans_stats[1] or 0,
                 'revenue': revenue[0] or 0
@@ -819,28 +610,40 @@ class Database:
             return result[0] if result else 0
 
     async def get_premium_user_count(self) -> int:
-        """Get premium user count"""
+        """Get premium user count from active subscriptions"""
         async with db_adapter.get_connection() as conn:
-            premium_check = "is_premium = TRUE" if db_adapter.is_postgres else "is_premium = 1"
-            cursor = await conn.execute(f'''
-                SELECT COUNT(*) FROM users
-                WHERE {premium_check} AND (premium_until IS NULL OR premium_until > ?)
+            cursor = await conn.execute('''
+                SELECT COUNT(DISTINCT user_id) FROM subscriptions
+                WHERE status = 'active' AND expires_at > ?
             ''', datetime.now())
             result = await cursor.fetchone()
             return result[0] if result else 0
 
     async def update_user_subscription(self, user_id: int, is_premium: bool,
                                      subscription_type: str, subscription_end: float):
-        """Update user subscription status"""
-        premium_until = datetime.fromtimestamp(subscription_end) if subscription_end else None
+        """Update user subscription status via subscriptions table"""
+        expires_at = datetime.fromtimestamp(subscription_end) if subscription_end else None
 
         async with db_adapter.get_connection() as conn:
             try:
-                await conn.execute('''
-                    UPDATE users
-                    SET is_premium = ?, premium_until = ?, updated_at = ?
-                    WHERE user_id = ?
-                ''', is_premium, premium_until, datetime.now(), user_id)
+                if is_premium and expires_at:
+                    # Add or update subscription
+                    now = datetime.now()
+                    await conn.execute('''
+                        INSERT INTO subscriptions (
+                            user_id, subscription_type, amount, payment_id,
+                            status, started_at, expires_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', user_id, subscription_type or 'unknown', 0.0, 'legacy_update',
+                         'active', now, expires_at)
+                else:
+                    # Deactivate subscription
+                    await conn.execute('''
+                        UPDATE subscriptions
+                        SET status = 'expired'
+                        WHERE user_id = ? AND status = 'active'
+                    ''', user_id)
+
                 await conn.commit()
                 return True
             except Exception as e:

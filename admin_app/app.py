@@ -572,6 +572,43 @@ def setup_admin_routes(aiohttp_app):
             traceback.print_exc()
             return web.json_response({"error": str(e)}, status=500)
 
+    async def grant_premium_endpoint(request):
+        """Grant premium subscription to user for 1 day"""
+        try:
+            admin_id = check_admin(request)
+
+            from bot.database import db
+
+            user_id = int(request.match_info['user_id'])
+
+            # Activate 1-day subscription
+            success = await db.activate_subscription(
+                user_id=user_id,
+                subscription_type='daily',
+                payment_id='admin_grant',
+                amount=0.0
+            )
+
+            if success:
+                # Log admin action
+                await db.log_admin_action(
+                    admin_user_id=admin_id,
+                    action='grant_premium',
+                    target_user_id=user_id,
+                    details={'duration': '1 day', 'method': 'admin_panel'}
+                )
+
+                return web.json_response({
+                    "success": True,
+                    "message": "Premium granted for 1 day"
+                })
+            else:
+                return web.json_response({"error": "Failed to grant premium"}, status=500)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
+
     # API routes
     aiohttp_app.router.add_get('/api/stats/', get_stats)
     aiohttp_app.router.add_get('/api/stats/daily', get_daily_stats)
@@ -581,6 +618,7 @@ def setup_admin_routes(aiohttp_app):
     aiohttp_app.router.add_get('/api/users/{user_id}/history', get_user_history)
     aiohttp_app.router.add_post('/api/users/{user_id}/block', block_user_endpoint)
     aiohttp_app.router.add_post('/api/users/{user_id}/unblock', unblock_user_endpoint)
+    aiohttp_app.router.add_post('/api/users/{user_id}/premium', grant_premium_endpoint)
     aiohttp_app.router.add_get('/api/logs/translations', get_translation_logs)
     aiohttp_app.router.add_get('/api/feedback', get_feedback)
     aiohttp_app.router.add_post('/api/feedback/{feedback_id}/status', update_feedback_status)
