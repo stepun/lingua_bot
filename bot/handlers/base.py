@@ -505,8 +505,8 @@ async def text_translation_handler(message: Message):
                 logger.info("Showing single translation (no two stages)")
                 response_text += f"📝 *Перевод ({style_display}):*\n{translated}"
 
-            # Add remaining translations info for free users
-            if not user_info.get('is_premium'):
+            # Add remaining translations info for free users (skip for admins)
+            if not user_info.get('is_premium') and not is_admin:
                 response_text += f"\n\n📊 Осталось переводов сегодня: {remaining - 1}"
 
             # Add enhanced info for premium users
