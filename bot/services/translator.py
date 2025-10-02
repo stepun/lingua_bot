@@ -22,6 +22,40 @@ class TranslatorService:
         if self.session:
             await self.session.close()
 
+    async def get_api_config(self) -> Dict[str, Any]:
+        """Get API configuration from database with fallback to config"""
+        try:
+            from bot.database import db
+
+            # Get settings from database with fallback to config
+            deepl_enabled = await db.get_setting('deepl_enabled', True)
+            yandex_enabled = await db.get_setting('yandex_enabled', True)
+            gpt_enhancement = await db.get_setting('gpt_enhancement', True)
+
+            deepl_api_key = await db.get_setting('deepl_api_key', config.DEEPL_API_KEY or '')
+            yandex_api_key = await db.get_setting('yandex_api_key', config.YANDEX_API_KEY or '')
+            openai_api_key = await db.get_setting('openai_api_key', config.OPENAI_API_KEY or '')
+
+            return {
+                'deepl_enabled': deepl_enabled,
+                'yandex_enabled': yandex_enabled,
+                'gpt_enhancement': gpt_enhancement,
+                'deepl_api_key': deepl_api_key.strip() if deepl_api_key else '',
+                'yandex_api_key': yandex_api_key.strip() if yandex_api_key else '',
+                'openai_api_key': openai_api_key.strip() if openai_api_key else '',
+            }
+        except Exception as e:
+            logger.error(f"Failed to get API config from database: {e}")
+            # Fallback to config values
+            return {
+                'deepl_enabled': True,
+                'yandex_enabled': True,
+                'gpt_enhancement': True,
+                'deepl_api_key': config.DEEPL_API_KEY or '',
+                'yandex_api_key': config.YANDEX_API_KEY or '',
+                'openai_api_key': config.OPENAI_API_KEY or '',
+            }
+
     async def detect_language(self, text: str) -> Optional[str]:
         """Detect the language of the text"""
         try:
@@ -31,14 +65,15 @@ class TranslatorService:
             return None
 
     async def translate_with_yandex(self, text: str, target_lang: str,
-                                   source_lang: str = None) -> Optional[str]:
+                                   source_lang: str = None, api_key: str = None) -> Optional[str]:
         """Translate text using Yandex Translate API"""
-        if not config.YANDEX_API_KEY:
+        yandex_key = api_key or config.YANDEX_API_KEY
+        if not yandex_key:
             return None
 
         url = "https://translate.api.cloud.yandex.net/translate/v2/translate"
         headers = {
-            "Authorization": f"Api-Key {config.YANDEX_API_KEY}",
+            "Authorization": f"Api-Key {yandex_key}",
             "Content-Type": "application/json"
         }
 
@@ -69,14 +104,15 @@ class TranslatorService:
             return None
 
     async def translate_with_deepl(self, text: str, target_lang: str,
-                                  source_lang: str = None) -> Optional[str]:
+                                  source_lang: str = None, api_key: str = None) -> Optional[str]:
         """Translate text using DeepL API"""
-        if not config.DEEPL_API_KEY:
+        deepl_key = api_key or config.DEEPL_API_KEY
+        if not deepl_key:
             return None
 
         url = "https://api-free.deepl.com/v2/translate"
         headers = {
-            "Authorization": f"DeepL-Auth-Key {config.DEEPL_API_KEY}",
+            "Authorization": f"DeepL-Auth-Key {deepl_key}",
             "Content-Type": "application/x-www-form-urlencoded"
         }
 
@@ -154,9 +190,10 @@ class TranslatorService:
             return None
 
     async def translate_with_openai_fallback(self, text: str, target_lang: str,
-                                           source_lang: str = None) -> Optional[str]:
+                                           source_lang: str = None, api_key: str = None) -> Optional[str]:
         """Simple translation using OpenAI as fallback when other services fail"""
-        if not config.OPENAI_API_KEY:
+        openai_key = api_key or config.OPENAI_API_KEY
+        if not openai_key:
             return None
 
         try:
@@ -193,7 +230,10 @@ class TranslatorService:
             target_lang_name = lang_names.get(target_lang, target_lang)
             source_lang_name = lang_names.get(source_lang, source_lang) if source_lang else "auto-detect"
 
-            response = await self.openai_client.chat.completions.create(
+            # Use custom API key if provided
+            client = openai.AsyncOpenAI(api_key=openai_key) if openai_key != config.OPENAI_API_KEY else self.openai_client
+
+            response = await client.chat.completions.create(
                 model=config.GPT_MODEL,
                 messages=[
                     {
@@ -217,7 +257,8 @@ class TranslatorService:
 
     async def enhance_with_gpt(self, original_text: str, translated_text: str,
                               target_lang: str, style: str = 'informal',
-                              explain_grammar: bool = False, user_id: int = None) -> Dict[str, Any]:
+                              explain_grammar: bool = False, user_id: int = None,
+                              api_key: str = None) -> Dict[str, Any]:
         """Enhance translation using GPT for natural language and style"""
         style_prompts = {
             'informal': 'casual and friendly, using colloquial expressions, contractions, and everyday language as if talking to a close friend',
@@ -279,7 +320,11 @@ Target language: {target_lang_name}
 Provide ONLY the enhanced translation in {target_lang_name} with {style} style. No explanations."""
 
         try:
-            response = await self.openai_client.chat.completions.create(
+            # Use custom API key if provided
+            openai_key = api_key or config.OPENAI_API_KEY
+            client = openai.AsyncOpenAI(api_key=openai_key) if openai_key != config.OPENAI_API_KEY else self.openai_client
+
+            response = await client.chat.completions.create(
                 model=config.GPT_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -361,6 +406,10 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
         """Main translation method with enhancement"""
         logger.info(f"Translation request: text='{text[:30]}...', target_lang={target_lang}, source_lang={source_lang}")
 
+        # Get API configuration from database
+        api_config = await self.get_api_config()
+        logger.info(f"API config: deepl_enabled={api_config['deepl_enabled']}, yandex_enabled={api_config['yandex_enabled']}, gpt_enhancement={api_config['gpt_enhancement']}")
+
         # Detect source language if not provided
         if not source_lang:
             source_lang = await self.detect_language(text)
@@ -372,12 +421,18 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
         translated = None
 
         # Try DeepL first (highest quality)
-        if config.DEEPL_API_KEY:
-            translated = await self.translate_with_deepl(text, target_lang, source_lang)
+        if api_config['deepl_enabled'] and api_config['deepl_api_key']:
+            logger.info("Trying DeepL translation...")
+            translated = await self.translate_with_deepl(text, target_lang, source_lang, api_config['deepl_api_key'])
+            if translated:
+                logger.info(f"DeepL translation success: {translated[:50]}")
 
         # Try Yandex if DeepL failed
-        if not translated and config.YANDEX_API_KEY:
-            translated = await self.translate_with_yandex(text, target_lang, source_lang)
+        if not translated and api_config['yandex_enabled'] and api_config['yandex_api_key']:
+            logger.info("Trying Yandex translation...")
+            translated = await self.translate_with_yandex(text, target_lang, source_lang, api_config['yandex_api_key'])
+            if translated:
+                logger.info(f"Yandex translation success: {translated[:50]}")
 
         # Fallback to Google Translate
         if not translated:
@@ -389,9 +444,9 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                 logger.error("Google Translate failed")
 
         # If all translation services fail, try a simple OpenAI-based translation
-        if not translated and config.OPENAI_API_KEY:
+        if not translated and api_config['openai_api_key']:
             logger.info("All translation services failed, trying OpenAI fallback")
-            translated = await self.translate_with_openai_fallback(text, target_lang, source_lang)
+            translated = await self.translate_with_openai_fallback(text, target_lang, source_lang, api_config['openai_api_key'])
             if translated:
                 logger.info(f"OpenAI fallback translation success: {translated[:50]}")
 
@@ -408,15 +463,15 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
             'original_text': text  # Store original text for re-translation
         }
 
-        if enhance and config.OPENAI_API_KEY:
+        if enhance and api_config['gpt_enhancement'] and api_config['openai_api_key']:
             logger.info(f"Starting GPT enhancement for text: {text[:50]}... with style: {style}")
-            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style, explain_grammar=explain_grammar, user_id=user_id)
+            enhancement = await self.enhance_with_gpt(text, translated, target_lang, style, explain_grammar=explain_grammar, user_id=user_id, api_key=api_config['openai_api_key'])
             logger.info(f"GPT enhancement result: {enhancement.get('enhanced_translation', 'No enhancement')[:50]}...")
             if enhancement['enhanced_translation']:
                 translated = enhancement['enhanced_translation']
             metadata.update(enhancement)
         else:
-            logger.info(f"GPT enhancement skipped: enhance={enhance}, openai_key_exists={bool(config.OPENAI_API_KEY)}")
+            logger.info(f"GPT enhancement skipped: enhance={enhance}, gpt_enhancement_enabled={api_config['gpt_enhancement']}, openai_key_exists={bool(api_config['openai_api_key'])}")
 
         logger.info(f"Translation completed: {source_lang} -> {target_lang}, result='{translated[:50]}...'")
         return translated, metadata

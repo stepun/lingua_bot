@@ -1,4 +1,6 @@
-version: '3.8'
+# Docker Compose for Local Development
+# Runs ONLY PostgreSQL in Docker
+# Bot runs locally via: python3 .scripts/run_dev.py
 
 services:
   postgres:
@@ -20,43 +22,6 @@ services:
       retries: 5
     networks:
       - linguabot_dev
-
-  linguabot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: linguabot_dev
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-    env_file:
-      - .env
-
-    environment:
-      - TZ=Europe/Moscow
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://linguabot:devpassword123@postgres:5432/linguabot
-      - PORT=8080
-      - WEBHOOK_HOST=https://88ac56bfbc4e.ngrok-free.app
-      - ADMIN_PANEL_URL=https://88ac56bfbc4e.ngrok-free.app
-
-    volumes:
-      - ./data:/home/linguabot/app/data
-      - ./logs:/home/linguabot/app/logs
-      - ./exports:/home/linguabot/app/exports
-      - .:/home/linguabot/app  # Mount source code for hot reload
-
-    ports:
-      - "8080:8080"
-
-    networks:
-      - linguabot_dev
-
-    labels:
-      - "project=linguabot"
-      - "environment=development"
 
 volumes:
   postgres_dev_data:

@@ -27,9 +27,38 @@ class VoiceService:
         if self.session:
             await self.session.close()
 
-    async def transcribe_with_whisper(self, audio_file_path: str) -> Optional[str]:
+    async def get_voice_config(self):
+        """Get voice configuration from database with fallback to config"""
+        try:
+            from bot.database import db
+
+            # Get settings from database with fallback to config
+            asr_enabled = await db.get_setting('asr_enabled', True)
+            tts_provider = await db.get_setting('tts_provider', 'openai')
+
+            openai_api_key = await db.get_setting('openai_api_key', config.OPENAI_API_KEY or '')
+            elevenlabs_api_key = await db.get_setting('elevenlabs_api_key', config.ELEVENLABS_API_KEY or '')
+
+            return {
+                'asr_enabled': asr_enabled,
+                'tts_provider': tts_provider,
+                'openai_api_key': openai_api_key.strip() if openai_api_key else '',
+                'elevenlabs_api_key': elevenlabs_api_key.strip() if elevenlabs_api_key else '',
+            }
+        except Exception as e:
+            logger.error(f"Failed to get voice config from database: {e}")
+            # Fallback to config values
+            return {
+                'asr_enabled': True,
+                'tts_provider': 'openai',
+                'openai_api_key': config.OPENAI_API_KEY or '',
+                'elevenlabs_api_key': config.ELEVENLABS_API_KEY or '',
+            }
+
+    async def transcribe_with_whisper(self, audio_file_path: str, api_key: str = None) -> Optional[str]:
         """Transcribe audio using OpenAI Whisper API"""
-        if not self.openai_client:
+        openai_key = api_key or config.OPENAI_API_KEY
+        if not openai_key:
             return None
 
         try:
@@ -40,7 +69,10 @@ class VoiceService:
             audio_file = io.BytesIO(audio_data)
             audio_file.name = Path(audio_file_path).name
 
-            response = await self.openai_client.audio.transcriptions.create(
+            # Use custom API key if provided
+            client = openai.AsyncOpenAI(api_key=openai_key) if openai_key != config.OPENAI_API_KEY else self.openai_client
+
+            response = await client.audio.transcriptions.create(
                 model=config.WHISPER_MODEL,
                 file=audio_file,
                 response_format="text"
@@ -84,9 +116,17 @@ class VoiceService:
 
     async def transcribe_audio(self, audio_file_path: str) -> Optional[str]:
         """Transcribe audio using available services"""
+        # Get voice configuration
+        voice_config = await self.get_voice_config()
+
+        # Check if ASR is enabled
+        if not voice_config['asr_enabled']:
+            logger.warning("ASR is disabled in settings")
+            return None
+
         # Try Whisper first
-        if config.OPENAI_API_KEY:
-            text = await self.transcribe_with_whisper(audio_file_path)
+        if voice_config['openai_api_key']:
+            text = await self.transcribe_with_whisper(audio_file_path, voice_config['openai_api_key'])
             if text:
                 return text
 
@@ -159,14 +199,15 @@ class VoiceService:
             return None
 
     async def generate_speech_elevenlabs(self, text: str, language: str = 'en',
-                                        voice_id: str = None) -> Optional[bytes]:
+                                        voice_id: str = None, api_key: str = None) -> Optional[bytes]:
         """Generate speech using ElevenLabs API (premium quality)"""
-        if not config.ELEVENLABS_API_KEY:
+        elevenlabs_key = api_key or config.ELEVENLABS_API_KEY
+        if not elevenlabs_key:
             return None
 
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id or 'default'}"
         headers = {
-            "xi-api-key": config.ELEVENLABS_API_KEY,
+            "xi-api-key": elevenlabs_key,
             "Content-Type": "application/json"
         }
 
@@ -194,13 +235,17 @@ class VoiceService:
             return None
 
     async def generate_speech_openai(self, text: str, language: str = 'en',
-                                    voice: str = 'alloy', speed: float = 1.0) -> Optional[bytes]:
+                                    voice: str = 'alloy', speed: float = 1.0, api_key: str = None) -> Optional[bytes]:
         """Generate speech using OpenAI TTS API"""
-        if not self.openai_client:
+        openai_key = api_key or config.OPENAI_API_KEY
+        if not openai_key:
             return None
 
         try:
-            response = await self.openai_client.audio.speech.create(
+            # Use custom API key if provided
+            client = openai.AsyncOpenAI(api_key=openai_key) if openai_key != config.OPENAI_API_KEY else self.openai_client
+
+            response = await client.audio.speech.create(
                 model="tts-1",
                 voice=voice,  # alloy, echo, fable, onyx, nova, shimmer
                 input=text,
@@ -219,17 +264,21 @@ class VoiceService:
                             premium: bool = False, speed: float = 1.0,
                             voice_type: str = 'alloy') -> Optional[bytes]:
         """Generate speech using available services"""
-        # For premium users, try higher quality services first
+        # Get voice configuration
+        voice_config = await self.get_voice_config()
+        tts_provider = voice_config['tts_provider']
+
+        # For premium users, try higher quality services first based on provider setting
         if premium:
-            # Try ElevenLabs first
-            if config.ELEVENLABS_API_KEY:
-                audio = await self.generate_speech_elevenlabs(text, language)
+            # Try ElevenLabs first if configured
+            if tts_provider == 'elevenlabs' and voice_config['elevenlabs_api_key']:
+                audio = await self.generate_speech_elevenlabs(text, language, api_key=voice_config['elevenlabs_api_key'])
                 if audio:
                     return audio
 
-            # Try OpenAI TTS with user settings
-            if config.OPENAI_API_KEY:
-                audio = await self.generate_speech_openai(text, language, voice=voice_type, speed=speed)
+            # Try OpenAI TTS with user settings (default or fallback)
+            if voice_config['openai_api_key']:
+                audio = await self.generate_speech_openai(text, language, voice=voice_type, speed=speed, api_key=voice_config['openai_api_key'])
                 if audio:
                     return audio
 

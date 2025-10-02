@@ -28,6 +28,7 @@ from admin_app.handlers import (
     delete_setting,
     bulk_update_settings
 )
+from admin_app.handlers.api_balance import get_all_balances
 
 
 def setup_admin_routes(aiohttp_app):
@@ -95,5 +96,8 @@ def setup_admin_routes(aiohttp_app):
     aiohttp_app.router.add_post('/api/settings', update_setting)
     aiohttp_app.router.add_post('/api/settings/bulk', bulk_update_settings)
     aiohttp_app.router.add_delete('/api/settings/{key}', delete_setting)
+
+    # API routes - API Balance
+    aiohttp_app.router.add_get('/api/balances', get_all_balances)
 
     return aiohttp_app
