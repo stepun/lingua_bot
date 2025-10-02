@@ -100,12 +100,20 @@ def get_style_selection_keyboard() -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_premium_keyboard() -> InlineKeyboardMarkup:
-    """Premium subscription keyboard"""
+async def get_premium_keyboard() -> InlineKeyboardMarkup:
+    """Premium subscription keyboard (with dynamic prices from DB)"""
+    from bot.database import db
+    from config import config
+
+    # Get prices from DB
+    daily_price = await db.get_setting('daily_price', config.DAILY_PRICE)
+    monthly_price = await db.get_setting('monthly_price', config.MONTHLY_PRICE)
+    yearly_price = await db.get_setting('yearly_price', config.YEARLY_PRICE)
+
     buttons = [
-        [InlineKeyboardButton(text="⚡ Премиум на 1 день — 100₽", callback_data="buy_telegram_daily")],
-        [InlineKeyboardButton(text="💳 Месячная подписка — 490₽", callback_data="buy_telegram_monthly")],
-        [InlineKeyboardButton(text="💎 Годовая подписка — 4680₽ (-20%)", callback_data="buy_telegram_yearly")],
+        [InlineKeyboardButton(text=f"⚡ Премиум на 1 день — {daily_price}₽", callback_data="buy_telegram_daily")],
+        [InlineKeyboardButton(text=f"💳 Месячная подписка — {monthly_price}₽", callback_data="buy_telegram_monthly")],
+        [InlineKeyboardButton(text=f"💎 Годовая подписка — {yearly_price}₽ (-20%)", callback_data="buy_telegram_yearly")],
         [InlineKeyboardButton(text="🎁 Экономьте 1200₽ с годовой подпиской!", callback_data="noop")],
         [InlineKeyboardButton(text="❓ Что входит в премиум?", callback_data="premium_features")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")]
@@ -113,12 +121,20 @@ def get_premium_keyboard() -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_premium_features_keyboard() -> InlineKeyboardMarkup:
-    """Premium features info keyboard"""
+async def get_premium_features_keyboard() -> InlineKeyboardMarkup:
+    """Premium features info keyboard (with dynamic prices from DB)"""
+    from bot.database import db
+    from config import config
+
+    # Get prices from DB
+    daily_price = await db.get_setting('daily_price', config.DAILY_PRICE)
+    monthly_price = await db.get_setting('monthly_price', config.MONTHLY_PRICE)
+    yearly_price = await db.get_setting('yearly_price', config.YEARLY_PRICE)
+
     buttons = [
-        [InlineKeyboardButton(text="⚡ 1 день — 100₽", callback_data="buy_telegram_daily")],
-        [InlineKeyboardButton(text="💳 Месячная — 490₽", callback_data="buy_telegram_monthly"),
-         InlineKeyboardButton(text="💎 Годовая — 4680₽", callback_data="buy_telegram_yearly")],
+        [InlineKeyboardButton(text=f"⚡ 1 день — {daily_price}₽", callback_data="buy_telegram_daily")],
+        [InlineKeyboardButton(text=f"💳 Месячная — {monthly_price}₽", callback_data="buy_telegram_monthly"),
+         InlineKeyboardButton(text=f"💎 Годовая — {yearly_price}₽", callback_data="buy_telegram_yearly")],
         [InlineKeyboardButton(text="◀️ Назад к подпискам", callback_data="premium")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="back_to_menu")]
     ]

@@ -103,6 +103,9 @@
             <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="roles" id="rolesTab">
                 <span class="tab-icon">👑</span><span class="tab-text" data-i18n="nav.roles">Roles</span>
             </button>
+            <button class="tab-btn flex-1 py-4 px-3 text-sm font-medium text-gray-600 border-b-3 border-transparent transition-all" data-tab="settings">
+                <span class="tab-icon">⚙️</span><span class="tab-text" data-i18n="nav.settings">Settings</span>
+            </button>
         </nav>
 
         <!-- Dashboard Tab -->
@@ -257,6 +260,31 @@
                     <button id="addAdminBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition" data-i18n="roles.add_admin">Add Admin</button>
                 </div>
                 <div id="rolesList" class="flex flex-col gap-3 max-h-[600px] overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content hidden p-4">
+            <div class="bg-white rounded-xl p-4 mb-4 shadow">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" data-i18n="settings.title">⚙️ System Settings</h2>
+
+                <!-- Category Filter -->
+                <div class="flex gap-2 mb-4 flex-wrap">
+                    <button class="category-btn px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition active" data-category="all" data-i18n="settings.category.all">All</button>
+                    <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition" data-category="translation" data-i18n="settings.category.translation">Translation</button>
+                    <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition" data-category="voice" data-i18n="settings.category.voice">Voice</button>
+                    <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition" data-category="pricing" data-i18n="settings.category.pricing">Pricing</button>
+                    <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition" data-category="limits" data-i18n="settings.category.limits">Limits</button>
+                    <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition" data-category="features" data-i18n="settings.category.features">Features</button>
+                </div>
+
+                <!-- Settings List -->
+                <div id="settingsList" class="flex flex-col gap-3 mb-4"></div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3 justify-end">
+                    <button id="saveSettingsBtn" class="px-6 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition" data-i18n="settings.save">Save Changes</button>
+                </div>
             </div>
         </div>
 

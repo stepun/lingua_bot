@@ -426,7 +426,8 @@ class Database:
                     ''', today, user_id)
                     await conn.commit()
 
-            remaining = config.FREE_DAILY_LIMIT - translations_today
+            free_daily_limit = await self.get_setting('free_daily_limit', config.FREE_DAILY_LIMIT)
+            remaining = free_daily_limit - translations_today
             return remaining > 0, remaining
 
     async def increment_translation_count(self, user_id: int) -> bool:
@@ -939,6 +940,100 @@ class Database:
             except Exception as e:
                 print(f"Error removing admin role: {e}")
                 return False
+
+    # ==================== System Settings ====================
+
+    async def get_setting(self, key: str, default: Any = None) -> Any:
+        """Get system setting by key with type conversion"""
+        async with db_adapter.get_connection() as conn:
+            row = await conn.fetchone('SELECT value, value_type FROM system_settings WHERE key = ?', key)
+
+            if not row:
+                return default
+
+            value, value_type = row['value'], row['value_type']
+
+            # Convert value based on type
+            try:
+                if value_type == 'integer':
+                    return int(value)
+                elif value_type == 'float':
+                    return float(value)
+                elif value_type == 'boolean':
+                    return value.lower() in ('true', '1', 'yes')
+                elif value_type == 'json':
+                    return json.loads(value)
+                else:  # string
+                    return value
+            except (ValueError, json.JSONDecodeError) as e:
+                print(f"[ERROR] Failed to convert setting {key}: {e}")
+                return default
+
+    async def set_setting(self, key: str, value: Any, category: str = 'general',
+                          description: str = '', updated_by: int = None) -> bool:
+        """Set or update system setting"""
+        # Determine value type
+        if isinstance(value, bool):
+            value_type, value_str = 'boolean', str(value).lower()
+        elif isinstance(value, int):
+            value_type, value_str = 'integer', str(value)
+        elif isinstance(value, float):
+            value_type, value_str = 'float', str(value)
+        elif isinstance(value, (dict, list)):
+            value_type, value_str = 'json', json.dumps(value)
+        else:
+            value_type, value_str = 'string', str(value)
+
+        async with db_adapter.get_connection() as conn:
+            await conn.execute('''
+                INSERT INTO system_settings (key, value, category, description, value_type, updated_by, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    category = EXCLUDED.category,
+                    description = EXCLUDED.description,
+                    value_type = EXCLUDED.value_type,
+                    updated_by = EXCLUDED.updated_by,
+                    updated_at = CURRENT_TIMESTAMP
+            ''', key, value_str, category, description, value_type, updated_by)
+            await conn.commit()
+            return True
+
+    async def get_all_settings(self, category: str = None) -> List[Dict[str, Any]]:
+        """Get all settings, optionally filtered by category"""
+        async with db_adapter.get_connection() as conn:
+            if category:
+                rows = await conn.fetchall('''
+                    SELECT key, value, category, description, value_type, updated_at
+                    FROM system_settings
+                    WHERE category = ?
+                    ORDER BY category, key
+                ''', category)
+            else:
+                rows = await conn.fetchall('''
+                    SELECT key, value, category, description, value_type, updated_at
+                    FROM system_settings
+                    ORDER BY category, key
+                ''')
+
+            return [
+                {
+                    'key': row['key'],
+                    'value': row['value'],
+                    'category': row['category'],
+                    'description': row['description'],
+                    'value_type': row['value_type'],
+                    'updated_at': row['updated_at'].isoformat() if row['updated_at'] else None
+                }
+                for row in rows
+            ]
+
+    async def delete_setting(self, key: str) -> bool:
+        """Delete system setting (reset to .env default)"""
+        async with db_adapter.get_connection() as conn:
+            await conn.execute('DELETE FROM system_settings WHERE key = ?', key)
+            await conn.commit()
+            return True
 
 # Create global database instance
 db = Database()

@@ -157,7 +157,7 @@ async def premium_handler(callback: CallbackQuery):
     else:
         await callback.message.edit_text(
             get_text('premium_info', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard()
+            reply_markup=await get_premium_keyboard()
         )
 
     await callback.answer()
@@ -169,7 +169,7 @@ async def premium_features_handler(callback: CallbackQuery):
 
     await callback.message.edit_text(
         get_text('premium_features', user_info.get('interface_language', 'ru')),
-        reply_markup=get_premium_features_keyboard(),
+        reply_markup=await get_premium_features_keyboard(),
         parse_mode='Markdown'
     )
     await callback.answer()
@@ -220,7 +220,7 @@ async def voice_speed_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -255,7 +255,7 @@ async def voice_type_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -290,7 +290,7 @@ async def history_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -323,7 +323,7 @@ async def clear_history_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -354,7 +354,7 @@ async def voice_translation_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -530,7 +530,7 @@ async def voice_exact_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -557,7 +557,7 @@ async def voice_styled_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -588,7 +588,7 @@ async def voice_alternatives_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -641,7 +641,7 @@ async def voice_any_style_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()
@@ -668,7 +668,7 @@ async def translate_any_style_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
-            reply_markup=get_premium_keyboard(),
+            reply_markup=await get_premium_keyboard(),
             parse_mode='Markdown'
         )
         await callback.answer()

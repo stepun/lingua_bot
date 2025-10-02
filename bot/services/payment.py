@@ -14,14 +14,16 @@ class TelegramPaymentService:
     def __init__(self):
         pass
 
-    def get_subscription_price(self, subscription_type: str) -> float:
-        """Get subscription price"""
+    async def get_subscription_price(self, subscription_type: str) -> float:
+        """Get subscription price (dynamically from DB)"""
+        from bot.database import db
+
         if subscription_type == "daily":
-            return config.DAILY_PRICE
+            return await db.get_setting('daily_price', config.DAILY_PRICE)
         elif subscription_type == "monthly":
-            return config.MONTHLY_PRICE
+            return await db.get_setting('monthly_price', config.MONTHLY_PRICE)
         elif subscription_type == "yearly":
-            return config.YEARLY_PRICE
+            return await db.get_setting('yearly_price', config.YEARLY_PRICE)
         return 0.0
 
     def get_subscription_description(self, subscription_type: str) -> str:

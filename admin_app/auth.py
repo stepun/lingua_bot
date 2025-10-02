@@ -9,10 +9,11 @@ from config import config
 
 # Role-based permissions mapping
 ROLE_PERMISSIONS = {
-    'admin': ['*'],  # Full access (includes manage_roles, grant_premium, etc.)
+    'admin': ['*'],  # Full access (includes manage_roles, grant_premium, manage_settings, etc.)
     'moderator': ['view_dashboard', 'view_users', 'view_logs', 'view_feedback', 'view_admin_logs',
                   'block_user', 'send_message', 'view_history', 'update_feedback'],
-    'analyst': ['view_dashboard', 'view_stats']
+    'analyst': ['view_dashboard', 'view_stats'],
+    'settings_manager': ['view_dashboard', 'view_stats', 'manage_settings']  # Can manage system settings
 }
 
 

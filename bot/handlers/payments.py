@@ -52,7 +52,7 @@ async def handle_telegram_payment(callback: CallbackQuery):
         return
 
     # Get subscription details
-    amount = telegram_payment_service.get_subscription_price(subscription_type)
+    amount = await telegram_payment_service.get_subscription_price(subscription_type)
     description = telegram_payment_service.get_subscription_description(subscription_type)
 
     # Create Telegram invoice

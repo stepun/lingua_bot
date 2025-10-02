@@ -18,6 +18,12 @@ from .roles import (
     remove_role_endpoint,
     get_current_user_role_endpoint
 )
+from .settings import (
+    get_settings,
+    update_setting,
+    delete_setting,
+    bulk_update_settings
+)
 
 __all__ = [
     'get_stats',
@@ -37,5 +43,9 @@ __all__ = [
     'get_admin_roles_endpoint',
     'assign_role_endpoint',
     'remove_role_endpoint',
-    'get_current_user_role_endpoint'
+    'get_current_user_role_endpoint',
+    'get_settings',
+    'update_setting',
+    'delete_setting',
+    'bulk_update_settings'
 ]

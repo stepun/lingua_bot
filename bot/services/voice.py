@@ -322,7 +322,8 @@ class VoiceService:
     async def validate_audio_duration(self, audio_data: bytes, max_duration: int = None) -> bool:
         """Validate audio duration"""
         if max_duration is None:
-            max_duration = config.MAX_VOICE_DURATION
+            from bot.database import db
+            max_duration = await db.get_setting('max_voice_duration', config.MAX_VOICE_DURATION)
 
         try:
             audio = AudioSegment.from_file(io.BytesIO(audio_data))

@@ -153,4 +153,52 @@ class Config:
 
         return True
 
+    @classmethod
+    async def load_from_db(cls, db):
+        """Load settings from database and override class attributes"""
+        try:
+            settings = await db.get_all_settings()
+
+            for setting in settings:
+                key = setting['key']
+                value = setting['value']
+                value_type = setting['value_type']
+
+                # Convert to proper type
+                if value_type == 'integer':
+                    value = int(value)
+                elif value_type == 'float':
+                    value = float(value)
+                elif value_type == 'boolean':
+                    value = value.lower() in ('true', '1', 'yes')
+                elif value_type == 'json':
+                    import json
+                    value = json.loads(value)
+
+                # Map database keys to Config attributes
+                key_mapping = {
+                    'free_daily_limit': 'FREE_DAILY_LIMIT',
+                    'daily_price': 'DAILY_PRICE',
+                    'monthly_price': 'MONTHLY_PRICE',
+                    'yearly_price': 'YEARLY_PRICE',
+                    'max_voice_duration': 'MAX_VOICE_DURATION',
+                    'max_history_items': 'MAX_HISTORY_ITEMS',
+                    'rate_limit_window': 'RATE_LIMIT_WINDOW',
+                    'rate_limit_requests': 'RATE_LIMIT_MAX_REQUESTS',
+                }
+
+                attr_name = key_mapping.get(key, key.upper())
+                if hasattr(cls, attr_name):
+                    setattr(cls, attr_name, value)
+                    print(f"[CONFIG] Loaded from DB: {attr_name} = {value}")
+
+        except Exception as e:
+            print(f"[CONFIG] Failed to load settings from database: {e}")
+            print("[CONFIG] Using .env defaults")
+
+    @classmethod
+    def get(cls, key: str, default: any = None) -> any:
+        """Get config value with fallback"""
+        return getattr(cls, key.upper(), default)
+
 config = Config()

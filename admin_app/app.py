@@ -22,7 +22,11 @@ from admin_app.handlers import (
     get_admin_roles_endpoint,
     assign_role_endpoint,
     remove_role_endpoint,
-    get_current_user_role_endpoint
+    get_current_user_role_endpoint,
+    get_settings,
+    update_setting,
+    delete_setting,
+    bulk_update_settings
 )
 
 
@@ -85,5 +89,11 @@ def setup_admin_routes(aiohttp_app):
     aiohttp_app.router.add_post('/api/admin-roles', assign_role_endpoint)
     aiohttp_app.router.add_delete('/api/admin-roles/{user_id}', remove_role_endpoint)
     aiohttp_app.router.add_get('/api/admin-roles/current', get_current_user_role_endpoint)
+
+    # API routes - System Settings
+    aiohttp_app.router.add_get('/api/settings', get_settings)
+    aiohttp_app.router.add_post('/api/settings', update_setting)
+    aiohttp_app.router.add_post('/api/settings/bulk', bulk_update_settings)
+    aiohttp_app.router.add_delete('/api/settings/{key}', delete_setting)
 
     return aiohttp_app

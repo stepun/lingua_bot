@@ -53,6 +53,10 @@ async def on_startup():
     try:
         await db.init()
         logger.info("✅ Database initialized")
+
+        # Load settings from database (overrides .env)
+        await config.load_from_db(db)
+        logger.info("⚙️ System settings loaded from database")
     except Exception as e:
         logger.error(f"❌ Database initialization error: {e}")
         return False
