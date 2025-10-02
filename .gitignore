@@ -4,8 +4,6 @@
 
 # Database
 *.db
-*.sqlite
-*.sqlite3
 
 # Python
 __pycache__/
@@ -102,3 +100,6 @@ get-docker.sh
 debug_railway.py
 get_railway_url.py
 check_your_railway.py
+
+# Local development scripts
+.scripts/

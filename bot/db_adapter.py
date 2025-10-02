@@ -1,24 +1,24 @@
-"""Database adapter for SQLite and PostgreSQL"""
+"""Database adapter for PostgreSQL only"""
 
 import os
-import aiosqlite
 import asyncpg
-from typing import Optional, Any
+from typing import Optional
 from contextlib import asynccontextmanager
 
 
 class DatabaseAdapter:
-    """Adapter for different database backends"""
+    """Adapter for PostgreSQL database"""
 
     def __init__(self):
         self.database_url = os.getenv("DATABASE_URL")
-        self.is_postgres = self.database_url and self.database_url.startswith("postgres")
-        self.db_path = os.getenv("DATABASE_PATH", "data/bot.db")
+        if not self.database_url:
+            raise ValueError("DATABASE_URL environment variable is required")
+
         self._pool: Optional[asyncpg.Pool] = None
 
     async def init_pool(self):
         """Initialize connection pool for PostgreSQL"""
-        if self.is_postgres and not self._pool:
+        if not self._pool:
             self._pool = await asyncpg.create_pool(self.database_url)
 
     async def close_pool(self):
@@ -30,68 +30,26 @@ class DatabaseAdapter:
     @asynccontextmanager
     async def get_connection(self):
         """Get database connection (context manager)"""
-        if self.is_postgres:
-            if not self._pool:
-                await self.init_pool()
-            async with self._pool.acquire() as conn:
-                yield PostgreSQLConnection(conn)
-        else:
-            async with aiosqlite.connect(self.db_path) as conn:
-                yield SQLiteConnection(conn)
+        if not self._pool:
+            await self.init_pool()
+        async with self._pool.acquire() as conn:
+            yield PostgreSQLConnection(conn)
 
     def placeholder(self, index: int) -> str:
         """Get parameter placeholder for query"""
-        if self.is_postgres:
-            return f"${index}"
-        else:
-            return "?"
+        return f"${index}"
 
     def get_serial_type(self) -> str:
         """Get auto-increment type"""
-        if self.is_postgres:
-            return "SERIAL PRIMARY KEY"
-        else:
-            return "INTEGER PRIMARY KEY AUTOINCREMENT"
+        return "SERIAL PRIMARY KEY"
 
     def get_boolean_type(self) -> str:
         """Get boolean type"""
-        if self.is_postgres:
-            return "BOOLEAN"
-        else:
-            return "BOOLEAN"
+        return "BOOLEAN"
 
     def get_timestamp_type(self) -> str:
         """Get timestamp type"""
-        if self.is_postgres:
-            return "TIMESTAMP"
-        else:
-            return "TIMESTAMP"
-
-
-class SQLiteConnection:
-    """Wrapper for SQLite connection"""
-
-    def __init__(self, conn):
-        self.conn = conn
-        self.is_postgres = False
-
-    async def execute(self, query: str, *args):
-        """Execute query"""
-        return await self.conn.execute(query, args if args else ())
-
-    async def fetchone(self, query: str, *args):
-        """Fetch one row"""
-        cursor = await self.execute(query, *args)
-        return await cursor.fetchone()
-
-    async def fetchall(self, query: str, *args):
-        """Fetch all rows"""
-        cursor = await self.execute(query, *args)
-        return await cursor.fetchall()
-
-    async def commit(self):
-        """Commit transaction"""
-        await self.conn.commit()
+        return "TIMESTAMP"
 
 
 class PostgreSQLCursor:
@@ -144,6 +102,10 @@ class PostgreSQLConnection:
         """Fetch all rows"""
         pg_query = self._convert_placeholders(query)
         return await self.conn.fetch(pg_query, *args)
+
+    async def fetch(self, query: str, *args):
+        """Fetch all rows (alias for fetchall)"""
+        return await self.fetchall(query, *args)
 
     async def commit(self):
         """Commit transaction (no-op for PostgreSQL, autocommit by default)"""

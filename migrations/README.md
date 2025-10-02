@@ -35,7 +35,7 @@ This directory contains versioned SQL migrations for the LinguaBot database sche
 ## Creating a New Migration
 
 1. Create file: `migrations/XXX_description.sql` (increment version number)
-2. Write SQL using PostgreSQL and SQLite compatible syntax when possible
+2. Write SQL using PostgreSQL syntax
 3. Test locally: `docker compose -f docker-compose.dev.yml restart linguabot`
 4. Verify: Check `schema_migrations` table for the new version
 

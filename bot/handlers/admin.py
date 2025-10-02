@@ -251,7 +251,7 @@ async def admin_stats(message: Message):
 
 🔧 **Система:**
 • Версия Python: 3.11
-• База данных: SQLite
+• База данных: PostgreSQL
 • Админ ID: {config.ADMIN_ID}
 """
 

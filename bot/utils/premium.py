@@ -13,9 +13,9 @@ async def check_premium_status(user_id: int) -> tuple[bool, datetime | None]:
     async with db_adapter.get_connection() as conn:
         subscription = await conn.fetchone("""
             SELECT expires_at FROM subscriptions
-            WHERE user_id = $1
+            WHERE user_id = ?
               AND status = 'active'
-              AND expires_at > $2
+              AND expires_at > ?
             ORDER BY expires_at DESC LIMIT 1
         """, user_id, datetime.now())
 

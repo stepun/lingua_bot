@@ -52,7 +52,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import sqlite3; sqlite3.connect('data/bot.db').execute('SELECT 1')" || exit 1
+    CMD python -c "import asyncio; import asyncpg; import os; asyncio.run(asyncpg.connect(os.getenv('DATABASE_URL')).close())" || exit 1
 
 # Expose port (if using webhooks)
 EXPOSE 8080
