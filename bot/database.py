@@ -339,7 +339,7 @@ class Database:
         async with db_adapter.get_connection() as conn:
             cursor = await conn.execute('''
                 SELECT u.*, s.auto_voice, s.save_history, s.notifications_enabled,
-                       s.voice_speed, s.voice_type
+                       s.voice_speed, s.voice_type, s.show_transcription
                 FROM users u
                 LEFT JOIN user_settings s ON u.user_id = s.user_id
                 WHERE u.user_id = ?
@@ -452,6 +452,7 @@ class Database:
                                      basic_translation: str = None,
                                      enhanced_translation: str = None,
                                      alternatives: list = None,
+                                     transcription: str = None,
                                      processing_time_ms: int = None,
                                      status: str = 'success',
                                      error_message: str = None) -> bool:
@@ -474,12 +475,12 @@ class Database:
                     INSERT INTO translation_history (
                         user_id, source_text, source_language, translated_text,
                         basic_translation, enhanced_translation, alternatives,
-                        target_language, translation_style, is_voice,
+                        transcription, target_language, translation_style, is_voice,
                         processing_time_ms, status, error_message
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', user_id, source_text, source_language, translated_text,
                      basic_translation, enhanced_translation, alternatives_json,
-                     target_language, style, is_voice,
+                     transcription, target_language, style, is_voice,
                      processing_time_ms, status, error_message)
 
                 # Clean old history (keep only last MAX_HISTORY_ITEMS)
@@ -596,7 +597,7 @@ class Database:
         """Update user settings"""
         async with db_adapter.get_connection() as conn:
             valid_settings = ['auto_voice', 'save_history', 'notifications_enabled',
-                            'voice_speed', 'voice_type']
+                            'voice_speed', 'voice_type', 'show_transcription']
             updates = []
             values = []
 

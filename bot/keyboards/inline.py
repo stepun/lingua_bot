@@ -146,6 +146,7 @@ def get_settings_keyboard(user_settings: dict) -> InlineKeyboardMarkup:
     auto_voice = "🔊 Вкл" if user_settings.get('auto_voice', False) else "🔇 Выкл"
     save_history = "✅ Вкл" if user_settings.get('save_history', True) else "❌ Выкл"
     notifications = "🔔 Вкл" if user_settings.get('notifications_enabled', True) else "🔕 Выкл"
+    show_transcription = "✅ Вкл" if user_settings.get('show_transcription', False) else "❌ Выкл"
     is_premium = user_settings.get('is_premium', False)
 
     buttons = []
@@ -155,7 +156,8 @@ def get_settings_keyboard(user_settings: dict) -> InlineKeyboardMarkup:
         buttons.extend([
             [InlineKeyboardButton(text=f"🔊 Автопроигрывание: {auto_voice}", callback_data="toggle_auto_voice")],
             [InlineKeyboardButton(text="🎚️ Скорость речи", callback_data="voice_speed")],
-            [InlineKeyboardButton(text="🗣️ Тип голоса", callback_data="voice_type")]
+            [InlineKeyboardButton(text="🗣️ Тип голоса", callback_data="voice_type")],
+            [InlineKeyboardButton(text=f"📝 Показывать транскрипцию: {show_transcription}", callback_data="toggle_show_transcription")]
         ])
 
     # General settings for all users

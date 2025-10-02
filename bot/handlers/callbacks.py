@@ -204,7 +204,8 @@ async def toggle_setting_handler(callback: CallbackQuery):
     setting_names = {
         'auto_voice': 'Автопроигрывание',
         'save_history': 'Сохранение истории',
-        'notifications_enabled': 'Уведомления'
+        'notifications_enabled': 'Уведомления',
+        'show_transcription': 'Транскрипция'
     }
 
     setting_name = setting_names.get(setting, setting)

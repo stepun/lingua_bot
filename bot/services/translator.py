@@ -293,19 +293,24 @@ Provide:
 1. Enhanced translation in {target_lang_name} with {style_description} style
 2. 2-3 alternative translations in {target_lang_name}
 3. Grammar explanation in Russian language
-4. Brief explanation of style choices in Russian language"""
+4. Brief explanation of style choices in Russian language
+5. Phonetic transcription (IPA) for the BASIC translation (not enhanced)"""
 
             user_prompt = f"""Original text: {original_text}
 Basic translation in {target_lang_name}: {translated_text}
 Target style: {style}
 Target language: {target_lang_name}
 
+IMPORTANT: Create IPA transcription for the BASIC translation ONLY: "{translated_text}"
+NOT for the enhanced/styled version!
+
 Format your response EXACTLY as:
 Enhanced: [enhanced translation in {target_lang_name}]
 Alternative1: [first alternative in {target_lang_name}]
 Alternative2: [second alternative in {target_lang_name}]
 Grammar: [grammar explanation in Russian]
-Explanation: [brief style explanation in Russian]"""
+Explanation: [brief style explanation in Russian]
+Transcription: [IPA for "{translated_text}" ONLY, e.g. [həˈləʊ]]"""
         else:
             # Simple enhancement for non-premium
             system_prompt = f"""You are a professional translator specializing in natural, contextual translations.
@@ -343,6 +348,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                 alternatives = []
                 grammar_explanation = ''
                 explanation = ''
+                transcription = ''
 
                 for line in lines:
                     line = line.strip()
@@ -360,6 +366,8 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                         grammar_explanation = line.split(':', 1)[1].strip()
                     elif line.lower().startswith('explanation:'):
                         explanation = line.split(':', 1)[1].strip()
+                    elif line.lower().startswith('transcription:'):
+                        transcription = line.split(':', 1)[1].strip()
 
                 # Add a third alternative if we have space
                 if len(alternatives) < 3 and translated_text != enhanced_translation:
@@ -370,6 +378,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     'alternatives': alternatives,
                     'explanation': explanation or f'Style adapted to {style}',
                     'grammar': grammar_explanation,
+                    'transcription': transcription,
                     'synonyms': []
                 }
             else:
@@ -385,6 +394,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     'alternatives': [],
                     'explanation': '',
                     'grammar': '',
+                    'transcription': '',
                     'synonyms': []
                 }
 
@@ -397,7 +407,8 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                 'enhanced_translation': translated_text,
                 'alternatives': [],
                 'explanation': '',
-                'grammar': ''
+                'grammar': '',
+                'transcription': ''
             }
 
     async def translate(self, text: str, target_lang: str, source_lang: str = None,

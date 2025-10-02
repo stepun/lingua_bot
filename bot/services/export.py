@@ -183,11 +183,26 @@ class ExportService:
                             time_str = created_at[11:16]  # Get time part
                         voice_icon = "🎤 " if item.get('is_voice', False) else ""
 
-                        translation_text = f"""
-                        <b>{voice_icon}🔸 {source_lang} → {target_lang}</b> ({time_str})<br/>
-                        <i>Оригинал:</i> {source_text}<br/>
-                        <i>Перевод:</i> {translated_text}
-                        """
+                        # Build translation text with optional fields
+                        translation_parts = [
+                            f"<b>{voice_icon}🔸 {source_lang} → {target_lang}</b> ({time_str})",
+                            f"<i>Оригинал:</i> {source_text}"
+                        ]
+
+                        # Add basic translation if available
+                        basic_translation = item.get('basic_translation')
+                        if basic_translation:
+                            translation_parts.append(f"<i>Точный перевод:</i> {basic_translation}")
+
+                        # Add transcription if available
+                        transcription = item.get('transcription')
+                        if transcription:
+                            translation_parts.append(f"<i>Транскрипция:</i> {transcription}")
+
+                        # Add styled translation
+                        translation_parts.append(f"<i>Стилизованный перевод:</i> {translated_text}")
+
+                        translation_text = "<br/>".join(translation_parts)
 
                         translation_para = Paragraph(translation_text, normal_style)
                         story.append(translation_para)
@@ -303,7 +318,19 @@ class ExportService:
 
                         content.append(f"{voice_icon}🔸 {source_lang} → {target_lang} ({time_str})")
                         content.append(f"   Оригинал: {source_text}")
-                        content.append(f"   Перевод:  {translated_text}")
+
+                        # Add basic translation if available
+                        basic_translation = item.get('basic_translation')
+                        if basic_translation:
+                            content.append(f"   Точный перевод: {basic_translation}")
+
+                        # Add transcription if available
+                        transcription = item.get('transcription')
+                        if transcription:
+                            content.append(f"   Транскрипция: {transcription}")
+
+                        # Add styled translation
+                        content.append(f"   Стилизованный перевод: {translated_text}")
                         content.append("")
 
             # Footer

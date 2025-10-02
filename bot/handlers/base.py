@@ -115,7 +115,7 @@ async def settings_handler(message: Message):
 
     await message.answer(text, reply_markup=get_settings_keyboard(user_info))
 
-@router.message(Command("feedback"))
+@router.message(Command("feedback", "отзыв"))
 async def feedback_handler(message: Message):
     """Handle feedback command"""
     user_info = await db.get_user(message.from_user.id)
@@ -263,6 +263,7 @@ async def voice_handler(message: Message):
                     basic_translation=metadata.get('basic_translation'),
                     enhanced_translation=metadata.get('enhanced_translation', translated),
                     alternatives=metadata.get('alternatives'),
+                    transcription=metadata.get('transcription'),
                     processing_time_ms=processing_time
                 )
 
@@ -279,8 +280,14 @@ async def voice_handler(message: Message):
 
                 # Show both translation stages for premium users
                 if 'basic_translation' in metadata and user_info.get('is_premium', False):
-                    response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n\n"
-                    response_text += f"✨ *Улучшенный перевод ({style_display}):*\n{translated}"
+                    response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n"
+
+                    # Show transcription if enabled for premium users (right after basic translation)
+                    if (user_info.get('show_transcription', False) and
+                        metadata.get('transcription')):
+                        response_text += f"🗣️ {metadata['transcription']}\n"
+
+                    response_text += f"\n✨ *Улучшенный перевод ({style_display}):*\n{translated}"
 
                     # Add synonyms/alternatives if available
                     if metadata.get('alternatives'):
@@ -410,6 +417,7 @@ async def text_translation_handler(message: Message):
                 basic_translation=metadata.get('basic_translation'),
                 enhanced_translation=metadata.get('enhanced_translation', translated),
                 alternatives=metadata.get('alternatives'),
+                transcription=metadata.get('transcription'),
                 processing_time_ms=processing_time
             )
             logger.info("Database updates completed")
@@ -448,8 +456,15 @@ async def text_translation_handler(message: Message):
             if 'basic_translation' in metadata:
                 # For all users - show both basic and styled translations
                 logger.info("Showing two-stage translation (basic + styled)")
-                response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n\n"
-                response_text += f"✨ *Стилизованный перевод ({style_display}):*\n{translated}"
+                response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n"
+
+                # Show transcription if enabled for premium users (right after basic translation)
+                if (user_info.get('is_premium', False) and
+                    user_info.get('show_transcription', False) and
+                    metadata.get('transcription')):
+                    response_text += f"🗣️ {metadata['transcription']}\n"
+
+                response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{translated}"
 
                 # Premium features - alternatives and explanations
                 if has_premium:

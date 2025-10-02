@@ -12,6 +12,7 @@ LinguaBot is an AI-powered Telegram translator bot with freemium model. It featu
 The bot uses a sophisticated 2-stage translation system:
 1. **Primary Translation**: DeepL API → Yandex Translate → Google Translate (fallback chain)
 2. **AI Enhancement**: OpenAI GPT-4o post-processing for style, context, and quality improvement
+3. **IPA Transcription** (Premium): GPT-4o generates phonetic transcription for basic translation
 
 Translation service priority is defined in `bot/services/translator.py:236-246`:
 - DeepL (highest quality, requires API key)
@@ -204,6 +205,7 @@ The `translation_history` table stores comprehensive translation data:
 - `basic_translation` - Direct translation result
 - `enhanced_translation` - GPT-4o enhanced version
 - `alternatives` - JSON array of alternative translations
+- `transcription` - IPA (International Phonetic Alphabet) transcription for basic translation (premium feature)
 - Enables proper voice synthesis for exact/styled/alternative translations
 
 ### Voice Handler Architecture
@@ -219,6 +221,50 @@ Voice handlers have strict data isolation:
 2. **Database Persistence**: All translations saved with basic/enhanced/alternatives fields
 3. **Voice Handlers**: Use memory first, fallback to database for reliability
 4. **Data Isolation**: Each voice type has dedicated data source to prevent mixing
+
+## Phonetic Transcription (IPA)
+
+**Premium Feature**: Displays International Phonetic Alphabet transcription for translations.
+
+### Configuration
+- **User Setting**: `show_transcription` in `user_settings` table (default: FALSE)
+- **Database Field**: `transcription` in `translation_history` table
+- **Toggle**: Premium users can enable/disable via Settings → 📝 Показывать транскрипцию
+
+### Implementation Details
+- **Generation**: GPT-4o generates IPA for **basic translation only** (not enhanced/styled)
+- **Location**: `bot/services/translator.py` - added to GPT prompt with explicit instructions
+- **Display**: Shows in chat as `🗣️ [IPA notation]` right after basic translation
+- **Export**: Included in both PDF and TXT exports with label "Транскрипция:"
+
+### Critical Prompt Instructions
+```
+IMPORTANT: Create IPA transcription for the BASIC translation ONLY: "{translated_text}"
+NOT for the enhanced/styled version!
+```
+
+### Display Format
+```
+📝 Точный перевод:
+Hello
+
+🗣️ [həˈləʊ]
+
+✨ Стилизованный перевод (неформальный):
+Hey there!
+```
+
+### Files Modified
+- `bot/services/translator.py` - GPT prompt and parsing
+- `bot/handlers/base.py` - Display logic (lines ~282, ~457) and history saving
+- `bot/keyboards/inline.py` - Settings UI button (premium only)
+- `bot/handlers/callbacks.py` - Toggle handler
+- `bot/database.py` - Field validation, retrieval, storage
+- `bot/services/export.py` - PDF/TXT export formatting
+
+### Migrations
+- `009_add_show_transcription.sql` - Adds `show_transcription` to `user_settings`
+- `010_add_transcription_to_history.sql` - Adds `transcription` to `translation_history`
 
 ## Monitoring System
 
@@ -475,6 +521,8 @@ This script:
 - `003_remove_premium_fields.sql`: Remove redundant premium fields from users table
 - `004_reset_migration_003.sql`: Reset migration 003 for re-application
 - `005_add_test_field.sql`: Test field for migration system validation (can be removed)
+- `009_add_show_transcription.sql`: Add `show_transcription` setting to `user_settings` table (IPA feature)
+- `010_add_transcription_to_history.sql`: Add `transcription` field to `translation_history` table (IPA storage)
 
 ### Important Notes
 
