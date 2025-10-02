@@ -18,11 +18,8 @@ Translation service priority is defined in `bot/services/translator.py:236-246`:
 - Yandex (good Russian support, requires API key)
 - Google Translate (fallback, no key needed)
 
-### Multiple Entry Points
+### Entry Point
 - `main.py` - Full aiogram-based bot with all features
-- `main_minimal.py` - WSL-compatible version using only stdlib
-- `main_fixed.py` - Version with graceful error handling
-- `main_simple.py` - Basic functionality version
 
 ### Configuration System
 All configuration is centralized in `config.py` with environment variable loading. Key models:
@@ -41,19 +38,18 @@ PostgreSQL-based with async operations in `bot/database.py`:
 
 ### Local Development
 ```bash
-# Run different bot versions
-python main.py                 # Full version (requires all dependencies)
-python main_minimal.py         # Minimal version (stdlib only)
-python main_fixed.py          # Version with error handling
-
 # Install dependencies
 pip install -r requirements.txt
 
-# Run tests
-python test_translation.py     # Test translation APIs with timeout
-python test_payments.py        # Test payment system
-python test_callbacks.py       # Test callback handlers
-python test_main_bot.py        # Test main bot functionality
+# Run bot in development mode
+python3 .scripts/run_dev.py      # Development mode with PostgreSQL
+python3 .scripts/run_admin.py    # Admin panel only
+python main.py                   # Production mode
+
+# Database utilities
+python3 .scripts/init_db.py      # Initialize database
+python3 .scripts/migrate_data.py # Migrate data between databases
+python3 run_migrations.py        # Run migrations
 ```
 
 ### Docker Development
@@ -61,9 +57,16 @@ python test_main_bot.py        # Test main bot functionality
 # Build and run with Docker
 docker-compose up --build -d
 
-# Use management scripts
-./docker-start.sh              # Interactive menu for Docker management
-docker-start.bat              # Windows version
+# Development with PostgreSQL
+docker-compose -f docker-compose.dev.yml up -d
+
+# Use management scripts (in .scripts/)
+.scripts/docker-start.sh       # Interactive menu for Docker management (Linux/macOS)
+.scripts/docker-start.bat      # Windows version
+.scripts/start_bot.sh          # Start bot locally
+.scripts/stop_bot.sh           # Stop bot locally
+.scripts/start_monitor.sh      # Start with monitoring
+.scripts/status.sh             # Check bot status
 
 # View logs
 docker-compose logs -f linguabot
@@ -120,7 +123,7 @@ Multi-stage Dockerfile optimized for production:
 - Resource limits: 512MB RAM, 0.5 CPU
 - Volume mounts for persistent data: `./data`, `./logs`, `./exports`
 
-The Docker setup runs `main.py` (full version) by default, not the minimal version.
+The Docker setup runs `main.py` with all features enabled.
 
 ## File Structure Notes
 
@@ -132,6 +135,40 @@ The Docker setup runs `main.py` (full version) by default, not the minimal versi
 - `data/` - PostgreSQL database backups and user data
 - `logs/` - Application logs
 - `exports/` - Generated PDF/TXT exports
+- `.scripts/` - Local development scripts (not tracked in git)
+
+### Development Scripts Organization
+
+All local development scripts are located in `.scripts/` directory (excluded from git):
+
+**Bot Management:**
+- `run_dev.py` - Run bot with PostgreSQL in development mode
+- `run_admin.py` - Run admin panel standalone
+- `start_bot.sh` / `start_bot.bat` - Start bot locally
+- `stop_bot.sh` - Stop local bot instance
+- `bot_monitor.py` - Process monitoring with auto-restart
+- `start_monitor.sh` - Start bot with monitoring
+- `check_and_restart.sh` - Health check and restart script
+- `status.sh` - Check bot status
+
+**Docker Management:**
+- `docker-start.sh` - Interactive Docker management menu (Linux/macOS)
+- `docker-start.bat` - Interactive Docker management menu (Windows)
+- `dev.sh` - Development environment setup
+
+**Database Utilities:**
+- `init_db.py` - Initialize database schema
+- `migrate_data.py` - Migrate data between databases
+- `delete_webhook.py` - Delete Telegram webhook
+
+**Production Scripts (in root):**
+- `main.py` - Main bot entry point
+- `config.py` - Configuration management
+- `install_beget.sh` - Install bot on Beget server
+- `start_beget.sh` - Start bot on Beget
+- `stop_beget.sh` - Stop bot on Beget
+- `run_migrations.py` - Apply database migrations
+- `apply_migrations_public.py` - Apply migrations to Railway
 
 ## Remote Server Access
 
@@ -141,15 +178,20 @@ SSH credentials and deployment info are in `creds.md`:
 
 ### Server Management Scripts
 ```bash
-# Server deployment and management
+# Server deployment and management (production)
+./install_beget.sh            # Install bot on Beget server
 ./start_beget.sh              # Start bot on Beget server
 ./stop_beget.sh               # Stop bot on server
-./status.sh                   # Check bot status
-./check_and_restart.sh        # Restart if crashed
 
-# Development/local
-./start_bot.sh                # Start bot locally
-./start_monitor.sh            # Start with monitoring
+# Local development scripts (in .scripts/)
+.scripts/run_dev.py           # Run bot in development mode
+.scripts/run_admin.py         # Run admin panel only
+.scripts/start_bot.sh         # Start bot locally
+.scripts/stop_bot.sh          # Stop bot locally
+.scripts/start_monitor.sh     # Start with monitoring
+.scripts/check_and_restart.sh # Restart if crashed
+.scripts/status.sh            # Check bot status
+.scripts/bot_monitor.py       # Process monitoring with auto-restart
 ```
 
 ## Database Schema
@@ -177,18 +219,10 @@ Voice handlers have strict data isolation:
 
 ## Monitoring System
 
-- `bot_monitor.py` - Process monitoring with auto-restart
+- `.scripts/bot_monitor.py` - Process monitoring with auto-restart
 - PID tracking in `/tmp/bot.pid` and `/tmp/monitor.pid`
 - Automatic health checks and recovery
 - Detailed logging in `logs/bot.log` and `logs/monitor.log`
-
-## Testing Infrastructure
-
-The codebase includes several test files:
-- Direct API testing with configurable timeouts
-- Payment flow verification
-- Callback handler validation
-- Main bot functionality tests
 
 ## Middleware Architecture
 
@@ -198,16 +232,15 @@ The codebase includes several test files:
 
 ## Common Issues
 
-1. **Module import errors**: Use `main_minimal.py` for environments without pip/venv
-2. **ADMIN_IDS format**: Must be numeric Telegram user ID, not username/URL
-3. **Docker not starting**: Ensure Docker Desktop is installed and WSL integration enabled
-4. **Translation failures**: Check API keys and account balances, services fail gracefully
-5. **Voice TTS errors**:
+1. **ADMIN_IDS format**: Must be numeric Telegram user ID, not username/URL
+2. **Docker not starting**: Ensure Docker Desktop is installed and WSL integration enabled
+3. **Translation failures**: Check API keys and account balances, services fail gracefully
+4. **Voice TTS errors**:
    - Invalid voice_type (must be: alloy, echo, fable, onyx, nova, shimmer, ash, sage, coral)
    - Check OpenAI API key and ElevenLabs configuration
    - Ensure Telegram voice message permissions are enabled
-6. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation
-7. **Admin panel database connection errors in Docker**:
+5. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation
+6. **Admin panel database connection errors in Docker**:
    - **Symptom**: Admin panel shows "Loading..." forever, API endpoints return 500 errors with `socket.gaierror: [Errno -2] Name or service not known`
    - **Cause**: Postgres container in different Docker network (e.g., "bridge" instead of "linguabot_dev_network")
    - **Fix**: Fully recreate all containers:
