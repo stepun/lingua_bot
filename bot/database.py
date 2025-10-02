@@ -133,6 +133,19 @@ class Database:
                 )
             ''')
 
+            # Admin roles table (PostgreSQL-only)
+            await conn.execute(f'''
+                CREATE TABLE IF NOT EXISTS admin_roles (
+                    user_id BIGINT PRIMARY KEY,
+                    role TEXT NOT NULL DEFAULT 'analyst',
+                    permissions TEXT,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+                    CHECK (role IN ('admin', 'moderator', 'analyst'))
+                )
+            ''')
+
             # Schema migrations table (PostgreSQL-only)
             await conn.execute(f'''
                 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -784,12 +797,14 @@ class Database:
                 details_json = json.dumps(details) if details else None
                 await conn.execute('''
                     INSERT INTO admin_actions (admin_user_id, action, target_user_id, details)
-                    VALUES ($1, $2, $3, $4)
+                    VALUES (?, ?, ?, ?)
                 ''', admin_user_id, action, target_user_id, details_json)
                 await conn.commit()
                 return True
             except Exception as e:
                 print(f"Error logging admin action: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
 
     async def get_admin_logs(self, admin_user_id: int = None, action: str = None, limit: int = 100):
@@ -798,17 +813,14 @@ class Database:
             try:
                 conditions = []
                 params = []
-                param_count = 1
 
                 if admin_user_id:
-                    conditions.append(f"aa.admin_user_id = ${param_count}")
+                    conditions.append("aa.admin_user_id = ?")
                     params.append(admin_user_id)
-                    param_count += 1
 
                 if action:
-                    conditions.append(f"aa.action = ${param_count}")
+                    conditions.append("aa.action = ?")
                     params.append(action)
-                    param_count += 1
 
                 where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -822,7 +834,7 @@ class Database:
                     LEFT JOIN users u2 ON aa.target_user_id = u2.user_id
                     {where_clause}
                     ORDER BY aa.created_at DESC
-                    LIMIT ${param_count}
+                    LIMIT ?
                 '''
 
                 rows = await conn.fetchall(query, *params)
@@ -845,6 +857,88 @@ class Database:
             except Exception as e:
                 print(f"Error getting admin logs: {e}")
                 return []
+
+    async def assign_role(self, user_id: int, role: str, permissions: dict = None) -> bool:
+        """Assign role to admin user"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                permissions_json = json.dumps(permissions) if permissions else None
+                await conn.execute('''
+                    INSERT INTO admin_roles (user_id, role, permissions, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        role = EXCLUDED.role,
+                        permissions = EXCLUDED.permissions,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', user_id, role, permissions_json)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error assigning role: {e}")
+                return False
+
+    async def get_user_role(self, user_id: int) -> dict:
+        """Get user role and permissions"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                row = await conn.fetchone('''
+                    SELECT role, permissions, created_at, updated_at
+                    FROM admin_roles
+                    WHERE user_id = ?
+                ''', user_id)
+
+                if row:
+                    return {
+                        'user_id': user_id,
+                        'role': row[0],
+                        'permissions': json.loads(row[1]) if row[1] else {},
+                        'created_at': row[2].isoformat() if row[2] else None,
+                        'updated_at': row[3].isoformat() if row[3] else None
+                    }
+                return None
+            except Exception as e:
+                print(f"Error getting user role: {e}")
+                return None
+
+    async def get_all_admin_users(self):
+        """Get all users with admin roles"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                rows = await conn.fetchall('''
+                    SELECT ar.user_id, u.username, u.first_name, u.last_name,
+                           ar.role, ar.permissions, ar.created_at, ar.updated_at
+                    FROM admin_roles ar
+                    LEFT JOIN users u ON ar.user_id = u.user_id
+                    ORDER BY ar.created_at DESC
+                ''')
+
+                admins = []
+                for row in rows:
+                    admins.append({
+                        'user_id': row[0],
+                        'username': row[1] or 'Unknown',
+                        'first_name': row[2] or '',
+                        'last_name': row[3] or '',
+                        'role': row[4],
+                        'permissions': json.loads(row[5]) if row[5] else {},
+                        'created_at': row[6].isoformat() if row[6] else None,
+                        'updated_at': row[7].isoformat() if row[7] else None
+                    })
+                return admins
+            except Exception as e:
+                print(f"Error getting admin users: {e}")
+                return []
+
+    async def remove_admin_role(self, user_id: int) -> bool:
+        """Remove admin role from user"""
+        async with db_adapter.get_connection() as conn:
+            try:
+                await conn.execute('DELETE FROM admin_roles WHERE user_id = ?', user_id)
+                await conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error removing admin role: {e}")
+                return False
 
 # Create global database instance
 db = Database()

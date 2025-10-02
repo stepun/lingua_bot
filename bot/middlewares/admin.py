@@ -38,5 +38,22 @@ class AdminMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 def is_admin(user_id: int) -> bool:
-    """Check if user is admin"""
+    """Check if user is admin (legacy - synchronous, only checks ADMIN_IDS)"""
+    return user_id in config.ADMIN_IDS
+
+
+async def check_admin_role(user_id: int) -> bool:
+    """Check if user has admin role (async, checks database first)
+
+    Checks admin_roles table first, then falls back to ADMIN_IDS for backward compatibility.
+    Returns True if user has any admin role (admin, moderator, analyst).
+    """
+    from bot.database import db
+
+    # Check database first
+    role_data = await db.get_user_role(user_id)
+    if role_data:
+        return True  # Any role grants access
+
+    # Fallback to legacy ADMIN_IDS
     return user_id in config.ADMIN_IDS

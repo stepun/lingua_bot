@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from bot.middlewares.admin import is_admin
+from bot.middlewares.admin import is_admin, check_admin_role
 from bot.database import Database
 from config import config
 import os
@@ -30,7 +30,7 @@ class AdminStates(StatesGroup):
 @router.message(Command("admin"))
 async def admin_panel(message: Message):
     """Admin panel main menu"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         await message.answer("❌ У вас нет прав администратора")
         return
 
@@ -63,13 +63,13 @@ async def open_admin_webapp(message: Message):
     logger.info(f"Admin panel command from user {user_id}, ADMIN_IDS: {config.ADMIN_IDS}")
 
     # Check admin rights
-    if not is_admin(user_id):
+    if not await check_admin_role(user_id):
         logger.warning(f"Access denied for user {user_id}")
         await message.answer(
             f"❌ У вас нет прав администратора\n\n"
             f"Ваш ID: `{user_id}`\n"
             f"Текущие админы: `{config.ADMIN_IDS}`\n\n"
-            f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS",
+            f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS или попросите админа назначить роль",
             parse_mode='Markdown'
         )
         return
@@ -120,7 +120,7 @@ async def open_admin_webapp(message: Message):
 @router.message(Command("admin_config"))
 async def admin_config(message: Message, state: FSMContext):
     """Payment system configuration"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         await message.answer("❌ У вас нет прав администратора")
         return
 
@@ -146,7 +146,7 @@ https://yookassa.ru/
 @router.message(Command("set_shop_id"))
 async def set_shop_id(message: Message, state: FSMContext):
     """Set YooKassa Shop ID"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         return
 
     await message.answer("💳 Введите Shop ID от YooKassa:")
@@ -170,7 +170,7 @@ async def process_shop_id(message: Message, state: FSMContext):
 @router.message(Command("set_secret_key"))
 async def set_secret_key(message: Message, state: FSMContext):
     """Set YooKassa Secret Key"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         return
 
     await message.answer("🔑 Введите Secret Key от YooKassa:")
@@ -200,7 +200,7 @@ async def process_secret_key(message: Message, state: FSMContext):
 @router.message(Command("set_webhook_secret"))
 async def set_webhook_secret(message: Message, state: FSMContext):
     """Set Webhook Secret"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         return
 
     await message.answer("🔐 Введите Webhook Secret:")
@@ -230,7 +230,7 @@ async def process_webhook_secret(message: Message, state: FSMContext):
 @router.message(Command("admin_stats"))
 async def admin_stats(message: Message):
     """Show bot statistics"""
-    if not is_admin(message.from_user.id):
+    if not await check_admin_role(message.from_user.id):
         return
 
     try:

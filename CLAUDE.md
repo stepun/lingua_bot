@@ -133,6 +133,7 @@ The Docker setup runs `main.py` with all features enabled.
 - `bot/keyboards/` - Telegram UI components
 - `bot/middlewares/` - Request processing middleware
 - `bot/utils/` - Shared utilities and messages
+- `admin_app/` - Admin panel WebApp (aiohttp + Telegram WebApp integration)
 - `data/` - PostgreSQL database backups and user data
 - `logs/` - Application logs
 - `exports/` - Generated PDF/TXT exports
@@ -231,6 +232,92 @@ Voice handlers have strict data isolation:
 - `bot/middlewares/throttling.py` - Rate limiting (configurable in config)
 - `bot/middlewares/user_middleware.py` - Automatic user registration
 - `bot/middlewares/admin.py` - Admin access control
+
+## Admin Panel
+
+The admin panel is a Telegram WebApp-based interface for managing users, viewing statistics, and monitoring bot activity. Located in `admin_app/` directory.
+
+### Features
+
+**User Management:**
+- View all users with pagination and search
+- Grant/revoke premium subscriptions (1 day increments)
+- Block/unblock users
+- Send direct messages to users via bot
+- View user translation history
+
+**Statistics Dashboard:**
+- Total users, premium users, active today
+- Daily translation statistics (7-day chart)
+- Language pair statistics
+- Performance metrics (avg processing time, success rate)
+- Error tracking by day
+
+**Logs & Monitoring:**
+- Translation logs (text/voice filtering)
+- System logs (last 50 lines)
+- Admin action logs (all admin operations tracked)
+
+**Feedback Management:**
+- View user feedback
+- Filter by status (new/reviewed/resolved)
+- Update feedback status
+
+### Admin Action Logging
+
+All admin operations are automatically logged to `admin_actions` table with details:
+
+**Logged Actions:**
+- `grant_premium` - Granting premium subscription
+- `ban_user` - Blocking user
+- `unban_user` - Unblocking user
+- `send_message` - Sending message to user (preview + length stored)
+- `update_feedback` - Changing feedback status
+- `view_history` - Viewing user translation history
+
+**Important:** Admin action logging uses `?` placeholders that are converted to PostgreSQL `$N` syntax by `db_adapter`. Never use `$1, $2...` directly in `database.py` - always use `?`.
+
+### Responsive Design
+
+**Mobile Navigation (≤640px):**
+- Icon-only navigation (📊 👥 📝 💬 🔒)
+- Hidden text labels to save space
+- Touch-optimized tap targets (14px padding)
+
+**Desktop/Tablet (>640px):**
+- Icon + text navigation
+- Flexbox layout with proper spacing
+
+### Sending Messages to Users
+
+Admins can send messages directly to users through the admin panel:
+
+1. Navigate to Users tab
+2. Click "Send Message" button (between "Grant Premium" and "Block")
+3. Enter message text in modal dialog
+4. Message is sent via bot with format: `📩 Message from admin:\n\n{text}`
+5. Action is logged to admin_actions with message preview
+
+**Implementation:**
+- API endpoint: `POST /api/users/{user_id}/send-message`
+- Creates new Bot instance for sending
+- Validates admin permissions via Telegram WebApp authentication
+- Logs action with first 100 chars of message
+
+### Access Control
+
+- Authentication via Telegram WebApp initData with HMAC validation
+- Admin IDs configured in `ADMIN_IDS` environment variable
+- All API endpoints check admin access via `check_admin(request)` helper
+- Returns admin user_id for logging purposes
+
+### File Structure
+
+- `admin_app/app.py` - Main aiohttp app, API endpoints
+- `admin_app/auth.py` - Telegram WebApp authentication
+- `admin_app/static/index.html` - Single-page application UI
+- `admin_app/static/app.js` - Frontend logic, API calls, translations
+- `admin_app/static/style.css` - Legacy styles (most use Tailwind inline)
 
 ## Common Issues
 
