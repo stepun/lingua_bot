@@ -294,23 +294,28 @@ Provide:
 2. 2-3 alternative translations in {target_lang_name}
 3. Grammar explanation in Russian language
 4. Brief explanation of style choices in Russian language
-5. Phonetic transcription (IPA) for the BASIC translation (not enhanced)"""
+5. Phonetic transcription (IPA) for ALL translations (basic, enhanced, alternatives)"""
 
             user_prompt = f"""Original text: {original_text}
 Basic translation in {target_lang_name}: {translated_text}
 Target style: {style}
 Target language: {target_lang_name}
 
-IMPORTANT: Create IPA transcription for the BASIC translation ONLY: "{translated_text}"
-NOT for the enhanced/styled version!
+IMPORTANT: Create IPA transcriptions for:
+- Basic translation: "{translated_text}"
+- Enhanced/styled translation
+- Each alternative translation
 
 Format your response EXACTLY as:
 Enhanced: [enhanced translation in {target_lang_name}]
+EnhancedTranscription: [IPA for enhanced, e.g. [həˈləʊ]]
 Alternative1: [first alternative in {target_lang_name}]
+Alternative1Transcription: [IPA for alternative1]
 Alternative2: [second alternative in {target_lang_name}]
+Alternative2Transcription: [IPA for alternative2]
 Grammar: [grammar explanation in Russian]
 Explanation: [brief style explanation in Russian]
-Transcription: [IPA for "{translated_text}" ONLY, e.g. [həˈləʊ]]"""
+Transcription: [IPA for "{translated_text}", e.g. [həˈləʊ]]"""
         else:
             # Simple enhancement for non-premium
             system_prompt = f"""You are a professional translator specializing in natural, contextual translations.
@@ -336,7 +341,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=1000  # Increased to accommodate all transcriptions
             )
 
             content = response.choices[0].message.content.strip()
@@ -349,19 +354,31 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                 grammar_explanation = ''
                 explanation = ''
                 transcription = ''
+                enhanced_transcription = ''
+                alternative_transcriptions = {}
 
                 for line in lines:
                     line = line.strip()
                     if line.lower().startswith('enhanced:'):
                         enhanced_translation = line.split(':', 1)[1].strip()
+                    elif line.lower().startswith('enhancedtranscription:'):
+                        enhanced_transcription = line.split(':', 1)[1].strip()
                     elif line.lower().startswith('alternative1:'):
                         alt = line.split(':', 1)[1].strip()
                         if alt:
-                            alternatives.append(alt)
+                            alternatives.append({'text': alt, 'transcription': ''})
+                    elif line.lower().startswith('alternative1transcription:'):
+                        trans = line.split(':', 1)[1].strip()
+                        if trans and len(alternatives) > 0:
+                            alternatives[0]['transcription'] = trans
                     elif line.lower().startswith('alternative2:'):
                         alt = line.split(':', 1)[1].strip()
                         if alt:
-                            alternatives.append(alt)
+                            alternatives.append({'text': alt, 'transcription': ''})
+                    elif line.lower().startswith('alternative2transcription:'):
+                        trans = line.split(':', 1)[1].strip()
+                        if trans and len(alternatives) > 1:
+                            alternatives[1]['transcription'] = trans
                     elif line.lower().startswith('grammar:'):
                         grammar_explanation = line.split(':', 1)[1].strip()
                     elif line.lower().startswith('explanation:'):
@@ -369,9 +386,9 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     elif line.lower().startswith('transcription:'):
                         transcription = line.split(':', 1)[1].strip()
 
-                # Add a third alternative if we have space
+                # Add a third alternative if we have space (with basic translation text)
                 if len(alternatives) < 3 and translated_text != enhanced_translation:
-                    alternatives.append(translated_text)
+                    alternatives.append({'text': translated_text, 'transcription': transcription})
 
                 result = {
                     'enhanced_translation': enhanced_translation,
@@ -379,6 +396,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     'explanation': explanation or f'Style adapted to {style}',
                     'grammar': grammar_explanation,
                     'transcription': transcription,
+                    'enhanced_transcription': enhanced_transcription,
                     'synonyms': []
                 }
             else:
@@ -395,6 +413,7 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                     'explanation': '',
                     'grammar': '',
                     'transcription': '',
+                    'enhanced_transcription': '',
                     'synonyms': []
                 }
 
@@ -408,7 +427,8 @@ Provide ONLY the enhanced translation in {target_lang_name} with {style} style. 
                 'alternatives': [],
                 'explanation': '',
                 'grammar': '',
-                'transcription': ''
+                'transcription': '',
+                'enhanced_transcription': ''
             }
 
     async def translate(self, text: str, target_lang: str, source_lang: str = None,

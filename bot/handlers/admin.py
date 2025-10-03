@@ -108,8 +108,7 @@ async def open_admin_webapp(message: Message):
             "• 📊 Статистика бота\n"
             "• 👥 Управление пользователями\n"
             "• 📝 Просмотр логов\n"
-            "• 🌍 Аналитика по языкам\n\n"
-            f"URL: {admin_url}",
+            "• 🌍 Аналитика по языкам",
             reply_markup=keyboard
         )
         logger.info(f"Admin panel opened for user {user_id}")

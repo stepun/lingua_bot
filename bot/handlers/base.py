@@ -4,6 +4,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 import logging
 import time
+import asyncio
 
 from bot.database import db
 from bot.keyboards.inline import get_main_menu_keyboard, get_translation_actions_keyboard
@@ -16,6 +17,25 @@ from config import config
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+async def keep_typing(bot, chat_id: int, action: str = 'typing'):
+    """Keep sending chat action every 4 seconds"""
+    try:
+        while True:
+            await bot.send_chat_action(chat_id=chat_id, action=action)
+            await asyncio.sleep(4)
+    except asyncio.CancelledError:
+        pass
+
+def escape_markdown(text: str) -> str:
+    """Escape special characters for Telegram Markdown"""
+    if not text:
+        return text
+    # Characters that need to be escaped in Telegram Markdown
+    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, '\\' + char)
+    return text
 
 @router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext):
@@ -62,14 +82,15 @@ async def help_handler(message: Message):
 @router.message(Command("premium", "премиум"))
 async def premium_handler(message: Message):
     """Handle premium command"""
+    from bot.keyboards.inline import get_premium_keyboard, get_main_menu_keyboard
     user_info = await db.get_user(message.from_user.id)
 
     if user_info.get('is_premium'):
         premium_text = get_text('already_premium', user_info.get('interface_language', 'ru'))
+        await message.answer(premium_text, reply_markup=get_main_menu_keyboard(True))
     else:
         premium_text = get_text('premium_info', user_info.get('interface_language', 'ru'))
-
-    await message.answer(premium_text)
+        await message.answer(premium_text, reply_markup=await get_premium_keyboard())
 
 @router.message(Command("language", "язык"))
 async def language_handler(message: Message):
@@ -184,15 +205,41 @@ async def history_handler(message: Message):
         await message.answer(get_text('no_history', user_info.get('interface_language', 'ru')))
         return
 
+    # Create keyboard with buttons for each history item
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    from datetime import datetime
+
+    buttons = []
+    for i, item in enumerate(history, 1):
+        # Format date
+        created_at = item['created_at']
+        if isinstance(created_at, datetime):
+            date_str = created_at.strftime('%Y-%m-%d %H:%M')
+        else:
+            date_str = created_at[:16]  # YYYY-MM-DD HH:MM
+
+        # Create button text
+        source_preview = item['source_text'][:30] + ('...' if len(item['source_text']) > 30 else '')
+        button_text = f"{i}. {source_preview} ({date_str})"
+
+        buttons.append([InlineKeyboardButton(
+            text=button_text,
+            callback_data=f"history_view_{item['id']}"
+        )])
+
+    # Add export and clear buttons
+    buttons.extend([
+        [InlineKeyboardButton(text="📄 Экспорт в PDF", callback_data="export_pdf")],
+        [InlineKeyboardButton(text="🗑️ Очистить историю", callback_data="clear_history_confirm")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")]
+    ])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
     text = get_text('history_header', user_info.get('interface_language', 'ru')) + "\n\n"
+    text += "Выберите перевод для просмотра:"
 
-    for item in history:
-        text += f"🔸 {item['source_text'][:50]}{'...' if len(item['source_text']) > 50 else ''}\n"
-        text += f"   → {item['translated_text'][:50]}{'...' if len(item['translated_text']) > 50 else ''}\n"
-        text += f"   📅 {item['created_at'][:19]}\n\n"
-
-    from bot.keyboards.inline import get_history_keyboard
-    await message.answer(text, reply_markup=get_history_keyboard())
+    await message.answer(text, reply_markup=keyboard)
 
 @router.message(F.voice)
 @rate_limit(key='voice', rate=5, per=60)
@@ -218,6 +265,9 @@ async def voice_handler(message: Message):
 
     # Show processing message
     processing_msg = await message.answer(get_text('processing_voice', user_info.get('interface_language', 'ru')))
+
+    # Start continuous typing indicator
+    typing_task = asyncio.create_task(keep_typing(message.bot, message.chat.id, 'typing'))
 
     try:
         async with VoiceService() as voice_service:
@@ -264,6 +314,7 @@ async def voice_handler(message: Message):
                     enhanced_translation=metadata.get('enhanced_translation', translated),
                     alternatives=metadata.get('alternatives'),
                     transcription=metadata.get('transcription'),
+                    enhanced_transcription=metadata.get('enhanced_transcription'),
                     processing_time_ms=processing_time
                 )
 
@@ -289,11 +340,24 @@ async def voice_handler(message: Message):
 
                     response_text += f"\n✨ *Улучшенный перевод ({style_display}):*\n{translated}"
 
+                    # Show enhanced transcription if enabled and available
+                    if (user_info.get('show_transcription', False) and
+                        metadata.get('enhanced_transcription')):
+                        response_text += f"\n🗣️ {metadata['enhanced_transcription']}"
+
                     # Add synonyms/alternatives if available
                     if metadata.get('alternatives'):
                         response_text += f"\n\n🔄 *Альтернативы:*\n"
                         for alt in metadata['alternatives'][:2]:  # Show max 2 alternatives
-                            response_text += f"• {alt}\n"
+                            # Handle both old format (string) and new format (dict)
+                            if isinstance(alt, dict):
+                                response_text += f"• {alt['text']}\n"
+                                # Show transcription for alternative if enabled
+                                if (user_info.get('show_transcription', False) and
+                                    alt.get('transcription')):
+                                    response_text += f"  🗣️ {alt['transcription']}\n"
+                            else:
+                                response_text += f"• {alt}\n"
 
                     # Add explanation if available
                     if metadata.get('explanation') and metadata['explanation'].strip():
@@ -323,6 +387,9 @@ async def voice_handler(message: Message):
     except Exception as e:
         logger.error(f"Voice processing error: {e}")
         await processing_msg.edit_text(get_text('voice_processing_failed', user_info.get('interface_language', 'ru')))
+    finally:
+        # Stop typing indicator
+        typing_task.cancel()
 
 @router.message(F.text & ~F.text.startswith('/'))
 @rate_limit(key='translation', rate=10, per=60)
@@ -374,8 +441,8 @@ async def text_translation_handler(message: Message):
             await message.answer(limit_text)
             return
 
-    # Show typing
-    await message.bot.send_chat_action(chat_id=message.chat.id, action='typing')
+    # Start continuous typing indicator
+    typing_task = asyncio.create_task(keep_typing(message.bot, message.chat.id, 'typing'))
 
     try:
         async with TranslatorService() as translator:
@@ -418,6 +485,7 @@ async def text_translation_handler(message: Message):
                 enhanced_translation=metadata.get('enhanced_translation', translated),
                 alternatives=metadata.get('alternatives'),
                 transcription=metadata.get('transcription'),
+                enhanced_transcription=metadata.get('enhanced_transcription'),
                 processing_time_ms=processing_time
             )
             logger.info("Database updates completed")
@@ -456,15 +524,21 @@ async def text_translation_handler(message: Message):
             if 'basic_translation' in metadata:
                 # For all users - show both basic and styled translations
                 logger.info("Showing two-stage translation (basic + styled)")
-                response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n"
+                response_text += f"📝 *Точный перевод:*\n{escape_markdown(metadata['basic_translation'])}\n"
 
                 # Show transcription if enabled for premium users (right after basic translation)
                 if (user_info.get('is_premium', False) and
                     user_info.get('show_transcription', False) and
                     metadata.get('transcription')):
-                    response_text += f"🗣️ {metadata['transcription']}\n"
+                    response_text += f"🗣️ {escape_markdown(metadata['transcription'])}\n"
 
-                response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{translated}"
+                response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{escape_markdown(translated)}"
+
+                # Show enhanced transcription if enabled and available
+                if (user_info.get('is_premium', False) and
+                    user_info.get('show_transcription', False) and
+                    metadata.get('enhanced_transcription')):
+                    response_text += f"\n🗣️ {escape_markdown(metadata['enhanced_transcription'])}"
 
                 # Premium features - alternatives and explanations
                 if has_premium:
@@ -472,7 +546,15 @@ async def text_translation_handler(message: Message):
                     if metadata.get('alternatives'):
                         response_text += f"\n\n🔄 *Альтернативы:*\n"
                         for alt in metadata['alternatives'][:3]:  # Show max 3 alternatives
-                            response_text += f"• {alt}\n"
+                            # Handle both old format (string) and new format (dict)
+                            if isinstance(alt, dict):
+                                response_text += f"• {escape_markdown(alt['text'])}\n"
+                                # Show transcription for alternative if enabled
+                                if (user_info.get('show_transcription', False) and
+                                    alt.get('transcription')):
+                                    response_text += f"  🗣️ {escape_markdown(alt['transcription'])}\n"
+                            else:
+                                response_text += f"• {escape_markdown(alt)}\n"
 
                     # Add explanation if available
                     if metadata.get('explanation') and metadata['explanation'].strip():
@@ -482,7 +564,7 @@ async def text_translation_handler(message: Message):
                             'en': "💡 *Explanation:*"
                         }
                         label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
-                        response_text += f"\n{label} {explanation}"
+                        response_text += f"\n{label} {escape_markdown(explanation)}"
                         if len(metadata['explanation']) > 200:
                             response_text += "..."
 
@@ -498,22 +580,16 @@ async def text_translation_handler(message: Message):
                             'en': "📚 *Grammar:*"
                         }
                         label = grammar_labels.get(user_info.get('interface_language', 'ru'), grammar_labels['ru'])
-                        response_text += f"\n\n{label} {grammar[:250]}"
+                        response_text += f"\n\n{label} {escape_markdown(grammar[:250])}"
                         if len(grammar) > 250:
                             response_text += "..."
             else:
                 logger.info("Showing single translation (no two stages)")
-                response_text += f"📝 *Перевод ({style_display}):*\n{translated}"
+                response_text += f"📝 *Перевод ({style_display}):*\n{escape_markdown(translated)}"
 
             # Add remaining translations info for free users (skip for admins)
             if not user_info.get('is_premium') and not is_admin:
                 response_text += f"\n\n📊 Осталось переводов сегодня: {remaining - 1}"
-
-            # Add enhanced info for premium users
-            if user_info.get('is_premium') and metadata.get('alternatives'):
-                response_text += f"\n\n🔄 *Альтернативы:*\n"
-                for alt in metadata['alternatives'][:2]:
-                    response_text += f"• {alt}\n"
 
             keyboard = get_translation_actions_keyboard(is_premium=user_info.get('is_premium', False), interface_lang=user_info.get('interface_language', 'ru'))
 
@@ -559,3 +635,6 @@ async def text_translation_handler(message: Message):
     except Exception as e:
         logger.error(f"Translation error: {e}")
         await message.answer(get_text('translation_failed', user_info.get('interface_language', 'ru')))
+    finally:
+        # Stop typing indicator
+        typing_task.cancel()

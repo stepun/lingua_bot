@@ -10,6 +10,7 @@ from bot.keyboards.reply import get_main_reply_keyboard
 from bot.services.translator import TranslatorService
 from bot.services.voice import VoiceService
 from bot.utils.messages import get_text
+from bot.handlers.base import escape_markdown
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -307,21 +308,41 @@ async def history_handler(callback: CallbackQuery):
         await callback.answer()
         return
 
-    text = get_text('history_header', user_info.get('interface_language', 'ru')) + "\n\n"
-
+    # Create keyboard with buttons for each history item
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
     from datetime import datetime
-    for item in history:
-        text += f"🔸 {item['source_text'][:50]}{'...' if len(item['source_text']) > 50 else ''}\n"
-        text += f"   → {item['translated_text'][:50]}{'...' if len(item['translated_text']) > 50 else ''}\n"
-        # Handle both datetime objects and strings
+
+    buttons = []
+    for i, item in enumerate(history, 1):
+        # Format date
         created_at = item['created_at']
         if isinstance(created_at, datetime):
-            date_str = created_at.strftime('%Y-%m-%d %H:%M:%S')
+            date_str = created_at.strftime('%Y-%m-%d %H:%M')
         else:
-            date_str = created_at[:19]
-        text += f"   📅 {date_str}\n\n"
+            date_str = created_at[:16]  # YYYY-MM-DD HH:MM
 
-    await callback.message.edit_text(text, reply_markup=get_history_keyboard())
+        # Create button text
+        source_preview = item['source_text'][:30] + ('...' if len(item['source_text']) > 30 else '')
+        button_text = f"{i}. {source_preview} ({date_str})"
+
+        buttons.append([InlineKeyboardButton(
+            text=button_text,
+            callback_data=f"history_view_{item['id']}"
+        )])
+
+    # Add export and clear buttons
+    buttons.extend([
+        [InlineKeyboardButton(text="📄 Экспорт в PDF", callback_data="export_pdf")],
+        [InlineKeyboardButton(text="🗑️ Очистить историю", callback_data="clear_history_confirm")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")]
+    ])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    text = get_text('history_header', user_info.get('interface_language', 'ru')) + "\n\n"
+    text += "Выберите перевод для просмотра:"
+
+    await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
 @router.callback_query(F.data == "clear_history")
@@ -424,11 +445,24 @@ async def show_alternatives_handler(callback: CallbackQuery):
         await callback.answer("❌ Альтернативы недоступны", show_alert=True)
         return
 
-    alternatives_text = "🔄 **Альтернативы перевода:**\n\n"
-    for i, alt in enumerate(metadata['alternatives'][:5], 1):
-        alternatives_text += f"{i}. {alt}\n"
+    # Get user settings for transcription display
+    user_info = await db.get_user(user_id)
+    show_transcription = user_info.get('show_transcription', False) and user_info.get('is_premium', False)
 
-    await callback.message.answer(alternatives_text, parse_mode='Markdown')
+    alternatives_text = "🔄 *Альтернативы перевода:*\n\n"
+    for i, alt in enumerate(metadata['alternatives'][:5], 1):
+        # Handle both old format (string) and new format (dict)
+        if isinstance(alt, dict):
+            alternatives_text += f"{i}\\. {alt['text']}\n"
+            # Show transcription if enabled and available
+            if show_transcription and alt.get('transcription'):
+                # Escape special Markdown characters in transcription
+                transcription = alt['transcription'].replace('[', '\\[').replace(']', '\\]').replace('_', '\\_')
+                alternatives_text += f"   🗣️ {transcription}\n"
+        else:
+            alternatives_text += f"{i}\\. {alt}\n"
+
+    await callback.message.answer(alternatives_text, parse_mode='MarkdownV2')
     await callback.answer()
 
 @router.callback_query(F.data == "show_explanation")
@@ -459,7 +493,7 @@ async def show_explanation_handler(callback: CallbackQuery):
     }
 
     header = explanation_headers.get(interface_lang, explanation_headers['ru'])
-    explanation_text = f"{header}\n\n{explanation}"
+    explanation_text = f"{header}\n\n{escape_markdown(explanation)}"
 
     await callback.message.answer(explanation_text, parse_mode='Markdown')
     await callback.answer()
@@ -492,7 +526,7 @@ async def show_grammar_handler(callback: CallbackQuery):
     }
 
     header = grammar_headers.get(interface_lang, grammar_headers['ru'])
-    grammar_text = f"{header}\n\n{grammar}"
+    grammar_text = f"{header}\n\n{escape_markdown(grammar)}"
 
     await callback.message.answer(grammar_text, parse_mode='Markdown')
     await callback.answer()
@@ -507,6 +541,9 @@ async def generate_voice_for_text(callback: CallbackQuery, text: str, voice_type
         return
 
     await callback.answer(f"🔊 Генерирую {voice_type_name}...")
+
+    # Show voice recording status
+    await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action='record_voice')
 
     try:
         async with VoiceService() as voice_service:
@@ -590,7 +627,7 @@ async def voice_styled_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "voice_alternatives")
 async def voice_alternatives_handler(callback: CallbackQuery):
-    """Generate voice for alternatives - let user pick which one"""
+    """Show alternatives selection for voice generation"""
     user_info = await db.get_user(callback.from_user.id)
 
     if not user_info.get('is_premium'):
@@ -621,10 +658,63 @@ async def voice_alternatives_handler(callback: CallbackQuery):
         await callback.answer("❌ Альтернативы недоступны", show_alert=True)
         return
 
-    # For now, voice the first alternative
-    # TODO: Could be enhanced to let user pick which alternative
-    first_alternative = alternatives[0]
-    await generate_voice_for_text(callback, first_alternative, "альтернативный перевод")
+    # Create keyboard with alternatives
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    buttons = []
+    for i, alt in enumerate(alternatives[:5], 1):
+        # Handle both old format (string) and new format (dict)
+        if isinstance(alt, dict):
+            text = alt['text'][:50] + ('...' if len(alt['text']) > 50 else '')
+        else:
+            text = alt[:50] + ('...' if len(alt) > 50 else '')
+
+        buttons.append([InlineKeyboardButton(
+            text=f"{i}. {text}",
+            callback_data=f"voice_alt_{i-1}"
+        )])
+
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_voice_menu")])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    await callback.message.edit_text(
+        "Выберите альтернативу для озвучивания:",
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("voice_alt_"))
+async def voice_specific_alternative_handler(callback: CallbackQuery):
+    """Voice a specific alternative"""
+    # Get alternative index
+    alt_index = int(callback.data.split("_")[-1])
+
+    user_id = callback.from_user.id
+    metadata = last_translation_metadata.get(user_id, {})
+    alternatives = metadata.get('alternatives', [])
+
+    # If no alternatives in memory, try to get from database
+    if not alternatives:
+        history = await db.get_user_history(user_id, limit=1)
+        if history and history[0].get('alternatives'):
+            import json
+            try:
+                alternatives = json.loads(history[0]['alternatives'])
+            except (json.JSONDecodeError, TypeError):
+                alternatives = []
+
+    if not alternatives or alt_index >= len(alternatives):
+        await callback.answer("❌ Альтернатива недоступна", show_alert=True)
+        return
+
+    selected_alternative = alternatives[alt_index]
+
+    # Handle both old format (string) and new format (dict)
+    if isinstance(selected_alternative, dict):
+        alternative_text = selected_alternative['text']
+    else:
+        alternative_text = selected_alternative
+
+    await generate_voice_for_text(callback, alternative_text, f"альтернатива #{alt_index + 1}")
 
 @router.callback_query(F.data == "back_to_translation")
 async def back_to_translation_handler(callback: CallbackQuery):
@@ -712,6 +802,9 @@ async def translate_with_style(callback: CallbackQuery, style: str, for_voice: b
     basic_translation = metadata.get('basic_translation', '')
 
     await callback.answer(f"🔄 Переводим в стиль: {style}...")
+
+    # Show typing
+    await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action='typing')
 
     try:
         async with TranslatorService() as translator:
@@ -821,5 +914,144 @@ async def back_to_voice_menu_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         voice_text.get(interface_lang, voice_text['ru']),
         reply_markup=get_voice_options_keyboard(has_alternatives, interface_lang)
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("history_view_"))
+async def history_view_handler(callback: CallbackQuery):
+    """View translation from history with full details"""
+    # Extract history item ID
+    history_id = int(callback.data.split("_")[-1])
+    user_id = callback.from_user.id
+
+    # Show typing
+    await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action='typing')
+
+    # Get history item from database
+    item = await db.get_history_item(history_id, user_id)
+
+    if not item:
+        await callback.answer("❌ Перевод не найден", show_alert=True)
+        return
+
+    user_info = await db.get_user(user_id)
+    interface_lang = user_info.get('interface_language', 'ru')
+
+    # Parse alternatives from JSON
+    import json
+    alternatives = []
+    if item.get('alternatives'):
+        try:
+            alternatives = json.loads(item['alternatives'])
+        except (json.JSONDecodeError, TypeError):
+            alternatives = []
+
+    # Build metadata dict
+    metadata = {
+        'source_lang': item.get('source_language', 'auto'),
+        'basic_translation': item.get('basic_translation'),
+        'enhanced_translation': item.get('enhanced_translation'),
+        'alternatives': alternatives,
+        'transcription': item.get('transcription'),
+        'enhanced_transcription': item.get('enhanced_transcription'),
+        'grammar': item.get('grammar'),
+        'explanation': item.get('explanation')
+    }
+
+    # Store metadata for buttons to work
+    last_translation_metadata[user_id] = metadata
+
+    # Format response text
+    from bot.services.translator import TranslatorService
+    async with TranslatorService() as translator:
+        source_lang_name = await translator.get_language_name(
+            item.get('source_language', 'auto'),
+            interface_lang
+        )
+        target_lang_name = await translator.get_language_name(
+            item.get('target_language', 'en'),
+            interface_lang
+        )
+
+    response_text = f"🌍 *{source_lang_name} → {target_lang_name}*\n\n"
+
+    # Show basic and enhanced translations
+    if item.get('basic_translation'):
+        response_text += f"📝 *Точный перевод:*\n{escape_markdown(item['basic_translation'])}\n"
+
+        # Show transcription if enabled
+        if (user_info.get('show_transcription', False) and
+            item.get('transcription')):
+            response_text += f"🗣️ {escape_markdown(item['transcription'])}\n"
+
+        # Get style display name
+        from config import config
+        style = item.get('style', 'informal')
+        style_names = config.TRANSLATION_STYLES_MULTILINGUAL.get(
+            interface_lang,
+            config.TRANSLATION_STYLES_MULTILINGUAL['ru']
+        )
+        style_display = style_names.get(style, style)
+
+        if item.get('enhanced_translation'):
+            response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{escape_markdown(item['enhanced_translation'])}"
+
+            # Show enhanced transcription if enabled
+            if (user_info.get('show_transcription', False) and
+                item.get('enhanced_transcription')):
+                response_text += f"\n🗣️ {escape_markdown(item['enhanced_transcription'])}"
+    else:
+        # Single translation display
+        response_text += f"📝 *Перевод:*\n{escape_markdown(item.get('translated_text', ''))}"
+
+    # Show alternatives if available
+    if alternatives and user_info.get('is_premium', False):
+        response_text += f"\n\n🔄 *Альтернативы:*\n"
+        for alt in alternatives[:3]:
+            if isinstance(alt, dict):
+                response_text += f"• {escape_markdown(alt['text'])}\n"
+                if (user_info.get('show_transcription', False) and
+                    alt.get('transcription')):
+                    response_text += f"  🗣️ {escape_markdown(alt['transcription'])}\n"
+            else:
+                response_text += f"• {escape_markdown(alt)}\n"
+
+    # Show explanation if available
+    if item.get('explanation') and item['explanation'].strip():
+        explanation = item['explanation'].strip()[:200]
+        explanation_labels = {
+            'ru': "💡 *Объяснение:*",
+            'en': "💡 *Explanation:*"
+        }
+        label = explanation_labels.get(interface_lang, explanation_labels['ru'])
+        response_text += f"\n{label} {escape_markdown(explanation)}"
+        if len(item['explanation']) > 200:
+            response_text += "..."
+
+    # Show grammar if available
+    if item.get('grammar') and item['grammar'].strip():
+        grammar = item['grammar'].strip()
+        if not grammar.endswith('.') and not grammar.endswith('!') and not grammar.endswith('?'):
+            grammar += '.'
+        grammar_labels = {
+            'ru': "📚 *Грамматика:*",
+            'en': "📚 *Grammar:*"
+        }
+        label = grammar_labels.get(interface_lang, grammar_labels['ru'])
+        response_text += f"\n\n{label} {escape_markdown(grammar[:250])}"
+        if len(grammar) > 250:
+            response_text += "..."
+
+    # Send message with action buttons
+    from bot.keyboards.inline import get_translation_actions_keyboard
+    keyboard = get_translation_actions_keyboard(
+        is_premium=user_info.get('is_premium', False),
+        interface_lang=interface_lang
+    )
+
+    await callback.message.answer(
+        response_text,
+        parse_mode='Markdown',
+        reply_markup=keyboard
     )
     await callback.answer()

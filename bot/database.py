@@ -416,7 +416,13 @@ class Database:
             # Reset counter if it's a new day
             today = datetime.now().date()
             if last_date:
-                last_date = datetime.fromisoformat(last_date).date()
+                # Handle both datetime objects and strings from database
+                if isinstance(last_date, datetime):
+                    last_date = last_date.date()
+                elif isinstance(last_date, str):
+                    last_date = datetime.fromisoformat(last_date).date()
+                # If it's already a date object, use as is
+
                 if last_date < today:
                     translations_today = 0
                     await conn.execute('''
@@ -426,7 +432,7 @@ class Database:
                     ''', today, user_id)
                     await conn.commit()
 
-            free_daily_limit = await self.get_setting('free_daily_limit', config.FREE_DAILY_LIMIT)
+            free_daily_limit = int(await self.get_setting('free_daily_limit', config.FREE_DAILY_LIMIT))
             remaining = free_daily_limit - translations_today
             return remaining > 0, remaining
 
@@ -453,6 +459,7 @@ class Database:
                                      enhanced_translation: str = None,
                                      alternatives: list = None,
                                      transcription: str = None,
+                                     enhanced_transcription: str = None,
                                      processing_time_ms: int = None,
                                      status: str = 'success',
                                      error_message: str = None) -> bool:
@@ -469,18 +476,25 @@ class Database:
                 alternatives_json = None
                 if alternatives:
                     import json
-                    alternatives_json = json.dumps(alternatives, ensure_ascii=False)
+                    # Handle both old format (list of strings) and new format (list of dicts)
+                    if alternatives and len(alternatives) > 0:
+                        if isinstance(alternatives[0], dict):
+                            # New format: [{"text": "...", "transcription": "..."}, ...]
+                            alternatives_json = json.dumps(alternatives, ensure_ascii=False)
+                        else:
+                            # Old format: ["text1", "text2", ...] - convert to new format
+                            alternatives_json = json.dumps([{"text": alt, "transcription": ""} for alt in alternatives], ensure_ascii=False)
 
                 await conn.execute('''
                     INSERT INTO translation_history (
                         user_id, source_text, source_language, translated_text,
                         basic_translation, enhanced_translation, alternatives,
-                        transcription, target_language, translation_style, is_voice,
+                        transcription, enhanced_transcription, target_language, translation_style, is_voice,
                         processing_time_ms, status, error_message
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', user_id, source_text, source_language, translated_text,
                      basic_translation, enhanced_translation, alternatives_json,
-                     transcription, target_language, style, is_voice,
+                     transcription, enhanced_transcription, target_language, style, is_voice,
                      processing_time_ms, status, error_message)
 
                 # Clean old history (keep only last MAX_HISTORY_ITEMS)
@@ -508,6 +522,16 @@ class Database:
             ''', user_id, limit)
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+    async def get_history_item(self, history_id: int, user_id: int) -> Dict[str, Any]:
+        """Get single history item by ID"""
+        async with db_adapter.get_connection() as conn:
+            cursor = await conn.execute('''
+                SELECT * FROM translation_history
+                WHERE id = ? AND user_id = ?
+            ''', history_id, user_id)
+            row = await cursor.fetchone()
+            return dict(row) if row else None
 
     async def clear_user_history(self, user_id: int) -> bool:
         """Clear user's translation history"""

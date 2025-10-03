@@ -24,6 +24,9 @@ async def export_pdf_handler(callback: CallbackQuery):
         await callback.answer("❌ Экспорт доступен только в премиум версии", show_alert=True)
         return
 
+    # Show typing
+    await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action='typing')
+
     # Show processing message
     await callback.message.edit_text("📄 Генерирую PDF файл...")
 
@@ -93,6 +96,9 @@ async def export_txt_handler(callback: CallbackQuery):
     if not user_info.get('is_premium'):
         await callback.answer("❌ Экспорт доступен только в премиум версии", show_alert=True)
         return
+
+    # Show typing
+    await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action='typing')
 
     # Show processing message
     await callback.message.edit_text("📝 Генерирую TXT файл...")

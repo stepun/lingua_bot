@@ -194,13 +194,37 @@ class ExportService:
                         if basic_translation:
                             translation_parts.append(f"<i>Точный перевод:</i> {basic_translation}")
 
-                        # Add transcription if available
-                        transcription = item.get('transcription')
-                        if transcription:
-                            translation_parts.append(f"<i>Транскрипция:</i> {transcription}")
+                            # Add transcription for basic translation if available
+                            transcription = item.get('transcription')
+                            if transcription:
+                                translation_parts.append(f"<i>Транскрипция:</i> {transcription}")
 
                         # Add styled translation
                         translation_parts.append(f"<i>Стилизованный перевод:</i> {translated_text}")
+
+                        # Add transcription for enhanced translation if available
+                        enhanced_transcription = item.get('enhanced_transcription')
+                        if enhanced_transcription:
+                            translation_parts.append(f"<i>Транскрипция:</i> {enhanced_transcription}")
+
+                        # Add alternatives if available
+                        alternatives_json = item.get('alternatives')
+                        if alternatives_json:
+                            try:
+                                import json
+                                alternatives = json.loads(alternatives_json) if isinstance(alternatives_json, str) else alternatives_json
+                                if alternatives:
+                                    translation_parts.append(f"<i>Альтернативы:</i>")
+                                    for alt in alternatives[:3]:
+                                        # Handle both old format (string) and new format (dict)
+                                        if isinstance(alt, dict):
+                                            translation_parts.append(f"  • {alt['text']}")
+                                            if alt.get('transcription'):
+                                                translation_parts.append(f"    <i>Транскрипция:</i> {alt['transcription']}")
+                                        else:
+                                            translation_parts.append(f"  • {alt}")
+                            except:
+                                pass
 
                         translation_text = "<br/>".join(translation_parts)
 
@@ -324,13 +348,38 @@ class ExportService:
                         if basic_translation:
                             content.append(f"   Точный перевод: {basic_translation}")
 
-                        # Add transcription if available
-                        transcription = item.get('transcription')
-                        if transcription:
-                            content.append(f"   Транскрипция: {transcription}")
+                            # Add transcription for basic translation if available
+                            transcription = item.get('transcription')
+                            if transcription:
+                                content.append(f"   Транскрипция: {transcription}")
 
                         # Add styled translation
                         content.append(f"   Стилизованный перевод: {translated_text}")
+
+                        # Add transcription for enhanced translation if available
+                        enhanced_transcription = item.get('enhanced_transcription')
+                        if enhanced_transcription:
+                            content.append(f"   Транскрипция: {enhanced_transcription}")
+
+                        # Add alternatives if available
+                        alternatives_json = item.get('alternatives')
+                        if alternatives_json:
+                            try:
+                                import json
+                                alternatives = json.loads(alternatives_json) if isinstance(alternatives_json, str) else alternatives_json
+                                if alternatives:
+                                    content.append(f"   Альтернативы:")
+                                    for alt in alternatives[:3]:
+                                        # Handle both old format (string) and new format (dict)
+                                        if isinstance(alt, dict):
+                                            content.append(f"     • {alt['text']}")
+                                            if alt.get('transcription'):
+                                                content.append(f"       Транскрипция: {alt['transcription']}")
+                                        else:
+                                            content.append(f"     • {alt}")
+                            except:
+                                pass
+
                         content.append("")
 
             # Footer
