@@ -480,7 +480,8 @@ async def show_explanation_handler(callback: CallbackQuery):
     user_info = await db.get_user(user_id)
     interface_lang = user_info.get('interface_language', 'ru') if user_info else 'ru'
 
-    explanation = metadata.get('explanation', '').strip()
+    explanation = metadata.get('explanation', '') or ''
+    explanation = explanation.strip()
     if not explanation:
         error_messages = {
             'ru': "❌ Объяснение недоступно",
