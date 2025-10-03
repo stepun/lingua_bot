@@ -514,7 +514,8 @@ async def show_grammar_handler(callback: CallbackQuery):
     user_info = await db.get_user(user_id)
     interface_lang = user_info.get('interface_language', 'ru') if user_info else 'ru'
 
-    grammar = metadata.get('grammar', '').strip()
+    grammar = metadata.get('grammar', '') or ''
+    grammar = grammar.strip()
     if not grammar:
         error_messages = {
             'ru': "❌ Грамматическое объяснение недоступно",
