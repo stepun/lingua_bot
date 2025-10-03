@@ -453,14 +453,18 @@ async def show_alternatives_handler(callback: CallbackQuery):
     for i, alt in enumerate(metadata['alternatives'][:5], 1):
         # Handle both old format (string) and new format (dict)
         if isinstance(alt, dict):
-            alternatives_text += f"{i}\\. {alt['text']}\n"
+            # Escape text for MarkdownV2
+            escaped_text = escape_markdown(alt['text'])
+            alternatives_text += f"{i}\\. {escaped_text}\n"
             # Show transcription if enabled and available
             if show_transcription and alt.get('transcription'):
                 # Escape special Markdown characters in transcription
                 transcription = alt['transcription'].replace('[', '\\[').replace(']', '\\]').replace('_', '\\_')
                 alternatives_text += f"   🗣️ {transcription}\n"
         else:
-            alternatives_text += f"{i}\\. {alt}\n"
+            # Old format: plain string - escape for MarkdownV2
+            escaped_alt = escape_markdown(alt)
+            alternatives_text += f"{i}\\. {escaped_alt}\n"
 
     await callback.message.answer(alternatives_text, parse_mode='MarkdownV2')
     await callback.answer()
