@@ -35,25 +35,25 @@ async def admin_panel(message: Message):
         return
 
     admin_text = f"""
-🔐 **Админ панель LinguaBot**
+🔐 <b>Админ панель LinguaBot</b>
 
-👤 **Ваш ID:** `{message.from_user.id}`
-✅ **Статус:** Администратор
+👤 <b>Ваш ID:</b> <code>{message.from_user.id}</code>
+✅ <b>Статус:</b> Администратор
 
-⚙️ **Доступные команды:**
+⚙️ <b>Доступные команды:</b>
 /admin_panel - Открыть веб-панель администратора
 /admin_config - Настройка платежной системы
 /admin_stats - Статистика бота
 /admin_users - Управление пользователями
 /admin_logs - Просмотр логов
 
-💳 **Текущая конфигурация YooKassa:**
-• Shop ID: `{config.YOOKASSA_SHOP_ID}`
-• Secret Key: `{'✅ Настроен' if config.YOOKASSA_SECRET_KEY != 'your_secret_key' else '❌ Не настроен'}`
-• Webhook Secret: `{'✅ Настроен' if config.PAYMENT_WEBHOOK_SECRET != 'your_webhook_secret' else '❌ Не настроен'}`
+💳 <b>Текущая конфигурация YooKassa:</b>
+• Shop ID: <code>{config.YOOKASSA_SHOP_ID}</code>
+• Secret Key: <code>{'✅ Настроен' if config.YOOKASSA_SECRET_KEY != 'your_secret_key' else '❌ Не настроен'}</code>
+• Webhook Secret: <code>{'✅ Настроен' if config.PAYMENT_WEBHOOK_SECRET != 'your_webhook_secret' else '❌ Не настроен'}</code>
 """
 
-    await message.answer(admin_text, parse_mode='Markdown')
+    await message.answer(admin_text, parse_mode='HTML')
 
 
 @router.message(Command("admin_panel"))
@@ -67,10 +67,10 @@ async def open_admin_webapp(message: Message):
         logger.warning(f"Access denied for user {user_id}")
         await message.answer(
             f"❌ У вас нет прав администратора\n\n"
-            f"Ваш ID: `{user_id}`\n"
-            f"Текущие админы: `{config.ADMIN_IDS}`\n\n"
+            f"Ваш ID: <code>{user_id}</code>\n"
+            f"Текущие админы: <code>{config.ADMIN_IDS}</code>\n\n"
             f"Для получения доступа добавьте ваш ID в переменную ADMIN_IDS или попросите админа назначить роль",
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         return
 
@@ -124,23 +124,23 @@ async def admin_config(message: Message, state: FSMContext):
         return
 
     config_text = f"""
-💳 **Настройка платежной системы YooKassa**
+💳 <b>Настройка платежной системы YooKassa</b>
 
-**Текущие настройки:**
-• Shop ID: `{config.YOOKASSA_SHOP_ID}`
-• Secret Key: `{'✅ Настроен' if config.YOOKASSA_SECRET_KEY != 'your_secret_key' else '❌ Не настроен'}`
-• Webhook Secret: `{'✅ Настроен' if config.PAYMENT_WEBHOOK_SECRET != 'your_webhook_secret' else '❌ Не настроен'}`
+<b>Текущие настройки:</b>
+• Shop ID: <code>{config.YOOKASSA_SHOP_ID}</code>
+• Secret Key: <code>{'✅ Настроен' if config.YOOKASSA_SECRET_KEY != 'your_secret_key' else '❌ Не настроен'}</code>
+• Webhook Secret: <code>{'✅ Настроен' if config.PAYMENT_WEBHOOK_SECRET != 'your_webhook_secret' else '❌ Не настроен'}</code>
 
-**Для настройки отправьте команды:**
+<b>Для настройки отправьте команды:</b>
 /set_shop_id - Установить Shop ID
 /set_secret_key - Установить Secret Key
 /set_webhook_secret - Установить Webhook Secret
 
-**Получить ключи можно в личном кабинете YooKassa:**
+<b>Получить ключи можно в личном кабинете YooKassa:</b>
 https://yookassa.ru/
 """
 
-    await message.answer(config_text, parse_mode='Markdown')
+    await message.answer(config_text, parse_mode='HTML')
 
 @router.message(Command("set_shop_id"))
 async def set_shop_id(message: Message, state: FSMContext):
@@ -163,7 +163,7 @@ async def process_shop_id(message: Message, state: FSMContext):
     # Update .env file
     update_env_var("YOOKASSA_SHOP_ID", shop_id)
 
-    await message.answer(f"✅ Shop ID установлен: `{shop_id}`\n\n⚠️ Для применения изменений необходимо перезапустить бота.", parse_mode='Markdown')
+    await message.answer(f"✅ Shop ID установлен: <code>{shop_id}</code>\n\n⚠️ Для применения изменений необходимо перезапустить бота.", parse_mode='HTML')
     await state.clear()
 
 @router.message(Command("set_secret_key"))
@@ -238,23 +238,23 @@ async def admin_stats(message: Message):
         premium_users = await db.get_premium_user_count()
 
         stats_text = f"""
-📊 **Статистика бота**
+📊 <b>Статистика бота</b>
 
-👥 **Пользователи:**
+👥 <b>Пользователи:</b>
 • Всего: {total_users}
 • Премиум: {premium_users}
 • Обычные: {total_users - premium_users}
 
-💳 **Платежная система:**
+💳 <b>Платежная система:</b>
 • Статус: {'✅ Настроена' if config.YOOKASSA_SHOP_ID != 'your_shop_id' else '❌ Не настроена'}
 
-🔧 **Система:**
+🔧 <b>Система:</b>
 • Версия Python: 3.11
 • База данных: PostgreSQL
 • Админ ID: {config.ADMIN_ID}
 """
 
-        await message.answer(stats_text, parse_mode='Markdown')
+        await message.answer(stats_text, parse_mode='HTML')
     except Exception as e:
         await message.answer(f"❌ Ошибка получения статистики: {e}")
 

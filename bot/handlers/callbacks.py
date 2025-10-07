@@ -10,7 +10,7 @@ from bot.keyboards.reply import get_main_reply_keyboard
 from bot.services.translator import TranslatorService
 from bot.services.voice import VoiceService
 from bot.utils.messages import get_text
-from bot.handlers.base import escape_markdown
+from bot.handlers.base import escape_html
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ async def premium_features_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         get_text('premium_features', user_info.get('interface_language', 'ru')),
         reply_markup=await get_premium_features_keyboard(),
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
     await callback.answer()
 
@@ -223,7 +223,7 @@ async def voice_speed_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -258,7 +258,7 @@ async def voice_type_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -293,7 +293,7 @@ async def history_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -353,7 +353,7 @@ async def clear_history_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -384,7 +384,7 @@ async def voice_translation_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -422,7 +422,7 @@ async def help_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         get_text('help', user_info.get('interface_language', 'ru')),
         reply_markup=get_main_menu_keyboard(user_info.get('is_premium', False)),
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
     await callback.answer()
 
@@ -449,24 +449,24 @@ async def show_alternatives_handler(callback: CallbackQuery):
     user_info = await db.get_user(user_id)
     show_transcription = user_info.get('show_transcription', False) and user_info.get('is_premium', False)
 
-    alternatives_text = "🔄 *Альтернативы перевода:*\n\n"
+    alternatives_text = "🔄 <b>Альтернативы перевода:</b>\n\n"
     for i, alt in enumerate(metadata['alternatives'][:5], 1):
         # Handle both old format (string) and new format (dict)
         if isinstance(alt, dict):
-            # Escape text for MarkdownV2
-            escaped_text = escape_markdown(alt['text'])
-            alternatives_text += f"{i}\\. {escaped_text}\n"
+            # Escape text for HTML
+            escaped_text = escape_html(alt['text'])
+            alternatives_text += f"{i}. {escaped_text}\n"
             # Show transcription if enabled and available
             if show_transcription and alt.get('transcription'):
-                # Escape special Markdown characters in transcription
-                transcription = alt['transcription'].replace('[', '\\[').replace(']', '\\]').replace('_', '\\_')
+                # No need to escape special characters in HTML
+                transcription = escape_html(alt['transcription'])
                 alternatives_text += f"   🗣️ {transcription}\n"
         else:
-            # Old format: plain string - escape for MarkdownV2
-            escaped_alt = escape_markdown(alt)
-            alternatives_text += f"{i}\\. {escaped_alt}\n"
+            # Old format: plain string - escape for HTML
+            escaped_alt = escape_html(alt)
+            alternatives_text += f"{i}. {escaped_alt}\n"
 
-    await callback.message.answer(alternatives_text, parse_mode='MarkdownV2')
+    await callback.message.answer(alternatives_text, parse_mode='HTML')
     await callback.answer()
 
 @router.callback_query(F.data == "show_explanation")
@@ -493,14 +493,14 @@ async def show_explanation_handler(callback: CallbackQuery):
 
     # Multilingual headers
     explanation_headers = {
-        'ru': "💡 **Объяснение перевода:**",
-        'en': "💡 **Translation explanation:**"
+        'ru': "💡 <b>Объяснение перевода:</b>",
+        'en': "💡 <b>Translation explanation:</b>"
     }
 
     header = explanation_headers.get(interface_lang, explanation_headers['ru'])
-    explanation_text = f"{header}\n\n{escape_markdown(explanation)}"
+    explanation_text = f"{header}\n\n{escape_html(explanation)}"
 
-    await callback.message.answer(explanation_text, parse_mode='Markdown')
+    await callback.message.answer(explanation_text, parse_mode='HTML')
     await callback.answer()
 
 @router.callback_query(F.data == "show_grammar")
@@ -527,14 +527,14 @@ async def show_grammar_handler(callback: CallbackQuery):
 
     # Multilingual headers
     grammar_headers = {
-        'ru': "📚 **Грамматическое объяснение:**",
-        'en': "📚 **Grammar explanation:**"
+        'ru': "📚 <b>Грамматическое объяснение:</b>",
+        'en': "📚 <b>Grammar explanation:</b>"
     }
 
     header = grammar_headers.get(interface_lang, grammar_headers['ru'])
-    grammar_text = f"{header}\n\n{escape_markdown(grammar)}"
+    grammar_text = f"{header}\n\n{escape_html(grammar)}"
 
-    await callback.message.answer(grammar_text, parse_mode='Markdown')
+    await callback.message.answer(grammar_text, parse_mode='HTML')
     await callback.answer()
 
 # Voice generation handlers
@@ -582,7 +582,7 @@ async def voice_exact_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -609,7 +609,7 @@ async def voice_styled_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -640,7 +640,7 @@ async def voice_alternatives_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -746,7 +746,7 @@ async def voice_any_style_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -773,7 +773,7 @@ async def translate_any_style_handler(callback: CallbackQuery):
         await callback.message.edit_text(
             get_text('premium_required', user_info.get('interface_language', 'ru')),
             reply_markup=await get_premium_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         await callback.answer()
         return
@@ -853,21 +853,22 @@ async def translate_with_style(callback: CallbackQuery, style: str, for_voice: b
                     user_info.get('interface_language', 'ru')
                 )
 
-                response_text = f"🌍 *{source_lang_name} → {target_lang_name}*\n\n"
-                response_text += f"📝 *Точный перевод:*\n{new_metadata.get('basic_translation', '')}\n\n"
-                response_text += f"✨ *Стилизованный перевод ({style_display}):*\n{translated}"
+                response_text = f"🌍 <b>{source_lang_name} → {target_lang_name}</b>\n\n"
+                response_text += f"📝 <b>Точный перевод:</b>\n{escape_html(new_metadata.get('basic_translation', ''))}\n\n"
+                response_text += f"✨ <b>Стилизованный перевод ({style_display}):</b>\n{escape_html(translated)}"
 
                 # Add alternatives and grammar if available
                 if new_metadata.get('alternatives'):
-                    response_text += f"\n\n🔄 *Альтернативы:*\n"
+                    response_text += f"\n\n🔄 <b>Альтернативы:</b>\n"
                     for alt in new_metadata['alternatives'][:3]:
-                        response_text += f"• {alt}\n"
+                        alt_text = alt['text'] if isinstance(alt, dict) else alt
+                        response_text += f"• {escape_html(alt_text)}\n"
 
                 if new_metadata.get('grammar') and new_metadata['grammar'].strip():
                     grammar = new_metadata['grammar'].strip()
                     if not grammar.endswith('.') and not grammar.endswith('!') and not grammar.endswith('?'):
                         grammar += '.'
-                    response_text += f"\n\n📚 *Грамматика:* {grammar[:250]}"
+                    response_text += f"\n\n📚 <b>Грамматика:</b> {escape_html(grammar[:250])}"
                     if len(grammar) > 250:
                         response_text += "..."
 
@@ -875,7 +876,7 @@ async def translate_with_style(callback: CallbackQuery, style: str, for_voice: b
 
                 await callback.message.answer(
                     response_text,
-                    parse_mode='Markdown',
+                    parse_mode='HTML',
                     reply_markup=keyboard
                 )
 
@@ -979,16 +980,16 @@ async def history_view_handler(callback: CallbackQuery):
             interface_lang
         )
 
-    response_text = f"🌍 *{source_lang_name} → {target_lang_name}*\n\n"
+    response_text = f"🌍 <b>{source_lang_name} → {target_lang_name}</b>\n\n"
 
     # Show basic and enhanced translations
     if item.get('basic_translation'):
-        response_text += f"📝 *Точный перевод:*\n{escape_markdown(item['basic_translation'])}\n"
+        response_text += f"📝 <b>Точный перевод:</b>\n{escape_html(item['basic_translation'])}\n"
 
         # Show transcription if enabled
         if (user_info.get('show_transcription', False) and
             item.get('transcription')):
-            response_text += f"🗣️ {escape_markdown(item['transcription'])}\n"
+            response_text += f"🗣️ {escape_html(item['transcription'])}\n"
 
         # Get style display name
         from config import config
@@ -1000,37 +1001,37 @@ async def history_view_handler(callback: CallbackQuery):
         style_display = style_names.get(style, style)
 
         if item.get('enhanced_translation'):
-            response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{escape_markdown(item['enhanced_translation'])}"
+            response_text += f"\n✨ <b>Стилизованный перевод ({style_display}):</b>\n{escape_html(item['enhanced_translation'])}"
 
             # Show enhanced transcription if enabled
             if (user_info.get('show_transcription', False) and
                 item.get('enhanced_transcription')):
-                response_text += f"\n🗣️ {escape_markdown(item['enhanced_transcription'])}"
+                response_text += f"\n🗣️ {escape_html(item['enhanced_transcription'])}"
     else:
         # Single translation display
-        response_text += f"📝 *Перевод:*\n{escape_markdown(item.get('translated_text', ''))}"
+        response_text += f"📝 <b>Перевод:</b>\n{escape_html(item.get('translated_text', ''))}"
 
     # Show alternatives if available
     if alternatives and user_info.get('is_premium', False):
-        response_text += f"\n\n🔄 *Альтернативы:*\n"
+        response_text += f"\n\n🔄 <b>Альтернативы:</b>\n"
         for alt in alternatives[:3]:
             if isinstance(alt, dict):
-                response_text += f"• {escape_markdown(alt['text'])}\n"
+                response_text += f"• {escape_html(alt['text'])}\n"
                 if (user_info.get('show_transcription', False) and
                     alt.get('transcription')):
-                    response_text += f"  🗣️ {escape_markdown(alt['transcription'])}\n"
+                    response_text += f"  🗣️ {escape_html(alt['transcription'])}\n"
             else:
-                response_text += f"• {escape_markdown(alt)}\n"
+                response_text += f"• {escape_html(alt)}\n"
 
     # Show explanation if available
     if item.get('explanation') and item['explanation'].strip():
         explanation = item['explanation'].strip()[:200]
         explanation_labels = {
-            'ru': "💡 *Объяснение:*",
-            'en': "💡 *Explanation:*"
+            'ru': "💡 <b>Объяснение:</b>",
+            'en': "💡 <b>Explanation:</b>"
         }
         label = explanation_labels.get(interface_lang, explanation_labels['ru'])
-        response_text += f"\n{label} {escape_markdown(explanation)}"
+        response_text += f"\n{label} {escape_html(explanation)}"
         if len(item['explanation']) > 200:
             response_text += "..."
 
@@ -1040,11 +1041,11 @@ async def history_view_handler(callback: CallbackQuery):
         if not grammar.endswith('.') and not grammar.endswith('!') and not grammar.endswith('?'):
             grammar += '.'
         grammar_labels = {
-            'ru': "📚 *Грамматика:*",
-            'en': "📚 *Grammar:*"
+            'ru': "📚 <b>Грамматика:</b>",
+            'en': "📚 <b>Grammar:</b>"
         }
         label = grammar_labels.get(interface_lang, grammar_labels['ru'])
-        response_text += f"\n\n{label} {escape_markdown(grammar[:250])}"
+        response_text += f"\n\n{label} {escape_html(grammar[:250])}"
         if len(grammar) > 250:
             response_text += "..."
 
@@ -1057,7 +1058,7 @@ async def history_view_handler(callback: CallbackQuery):
 
     await callback.message.answer(
         response_text,
-        parse_mode='Markdown',
+        parse_mode='HTML',
         reply_markup=keyboard
     )
     await callback.answer()

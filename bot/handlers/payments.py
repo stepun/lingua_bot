@@ -125,7 +125,7 @@ async def handle_successful_payment(message: Message):
                 else:
                     logger.info(f"PRODUCTION payment processed successfully for user {user_id}")
 
-                success_text = f"""✅ *Платеж успешно обработан!*
+                success_text = f"""✅ <b>Платеж успешно обработан!</b>
 
 🎉 Премиум подписка активирована!
 💎 Теперь вам доступны все функции бота:
@@ -139,7 +139,7 @@ async def handle_successful_payment(message: Message):
 
                 await message.answer(
                     success_text,
-                    parse_mode='Markdown',
+                    parse_mode='HTML',
                     reply_markup=get_main_menu_keyboard(True)
                 )
             else:

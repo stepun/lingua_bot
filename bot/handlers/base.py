@@ -27,14 +27,14 @@ async def keep_typing(bot, chat_id: int, action: str = 'typing'):
     except asyncio.CancelledError:
         pass
 
-def escape_markdown(text: str) -> str:
-    """Escape special characters for Telegram Markdown"""
+def escape_html(text: str) -> str:
+    """Escape special characters for Telegram HTML"""
     if not text:
         return text
-    # Characters that need to be escaped in Telegram Markdown
-    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    for char in special_chars:
-        text = text.replace(char, '\\' + char)
+    # Only these characters need escaping in HTML
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
     return text
 
 @router.message(CommandStart())
@@ -327,51 +327,51 @@ async def voice_handler(message: Message):
                 style_display = style_names.get(style, style)
 
                 # Format response
-                response_text = f"🎤 *Распознано:* {text}\n\n"
+                response_text = f"🎤 <b>Распознано:</b> {escape_html(text)}\n\n"
 
                 # Show both translation stages for premium users
                 if 'basic_translation' in metadata and user_info.get('is_premium', False):
-                    response_text += f"📝 *Точный перевод:*\n{metadata['basic_translation']}\n"
+                    response_text += f"📝 <b>Точный перевод:</b>\n{escape_html(metadata['basic_translation'])}\n"
 
                     # Show transcription if enabled for premium users (right after basic translation)
                     if (user_info.get('show_transcription', False) and
                         metadata.get('transcription')):
-                        response_text += f"🗣️ {metadata['transcription']}\n"
+                        response_text += f"🗣️ {escape_html(metadata['transcription'])}\n"
 
-                    response_text += f"\n✨ *Улучшенный перевод ({style_display}):*\n{translated}"
+                    response_text += f"\n✨ <b>Улучшенный перевод ({style_display}):</b>\n{escape_html(translated)}"
 
                     # Show enhanced transcription if enabled and available
                     if (user_info.get('show_transcription', False) and
                         metadata.get('enhanced_transcription')):
-                        response_text += f"\n🗣️ {metadata['enhanced_transcription']}"
+                        response_text += f"\n🗣️ {escape_html(metadata['enhanced_transcription'])}"
 
                     # Add synonyms/alternatives if available
                     if metadata.get('alternatives'):
-                        response_text += f"\n\n🔄 *Альтернативы:*\n"
+                        response_text += f"\n\n🔄 <b>Альтернативы:</b>\n"
                         for alt in metadata['alternatives'][:2]:  # Show max 2 alternatives
                             # Handle both old format (string) and new format (dict)
                             if isinstance(alt, dict):
-                                response_text += f"• {alt['text']}\n"
+                                response_text += f"• {escape_html(alt['text'])}\n"
                                 # Show transcription for alternative if enabled
                                 if (user_info.get('show_transcription', False) and
                                     alt.get('transcription')):
-                                    response_text += f"  🗣️ {alt['transcription']}\n"
+                                    response_text += f"  🗣️ {escape_html(alt['transcription'])}\n"
                             else:
-                                response_text += f"• {alt}\n"
+                                response_text += f"• {escape_html(alt)}\n"
 
                     # Add explanation if available
                     if metadata.get('explanation') and metadata['explanation'].strip():
                         explanation = metadata['explanation'].strip()[:150]  # Shorter for voice
                         explanation_labels = {
-                            'ru': "💡 *Объяснение:*",
-                            'en': "💡 *Explanation:*"
+                            'ru': "💡 <b>Объяснение:</b>",
+                            'en': "💡 <b>Explanation:</b>"
                         }
                         label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
-                        response_text += f"\n{label} {explanation}"
+                        response_text += f"\n{label} {escape_html(explanation)}"
                         if len(metadata['explanation']) > 150:
                             response_text += "..."
                 else:
-                    response_text += f"🌍 *Перевод ({style_display}, {config.SUPPORTED_LANGUAGES.get(target_lang, target_lang)}):*\n{translated}"
+                    response_text += f"🌍 <b>Перевод ({style_display}, {config.SUPPORTED_LANGUAGES.get(target_lang, target_lang)}):</b>\n{escape_html(translated)}"
 
                 # Store metadata for callback buttons
                 if user_info.get('is_premium', False):
@@ -380,7 +380,7 @@ async def voice_handler(message: Message):
 
                 await processing_msg.edit_text(
                     response_text,
-                    parse_mode='Markdown',
+                    parse_mode='HTML',
                     reply_markup=get_translation_actions_keyboard(is_premium=user_info.get('is_premium', False), interface_lang=user_info.get('interface_language', 'ru'))
                 )
 
@@ -524,47 +524,47 @@ async def text_translation_handler(message: Message):
             if 'basic_translation' in metadata:
                 # For all users - show both basic and styled translations
                 logger.info("Showing two-stage translation (basic + styled)")
-                response_text += f"📝 *Точный перевод:*\n{escape_markdown(metadata['basic_translation'])}\n"
+                response_text += f"📝 <b>Точный перевод:</b>\n{escape_html(metadata['basic_translation'])}\n"
 
                 # Show transcription if enabled for premium users (right after basic translation)
                 if (user_info.get('is_premium', False) and
                     user_info.get('show_transcription', False) and
                     metadata.get('transcription')):
-                    response_text += f"🗣️ {escape_markdown(metadata['transcription'])}\n"
+                    response_text += f"🗣️ {escape_html(metadata['transcription'])}\n"
 
-                response_text += f"\n✨ *Стилизованный перевод ({style_display}):*\n{escape_markdown(translated)}"
+                response_text += f"\n✨ <b>Стилизованный перевод ({style_display}):</b>\n{escape_html(translated)}"
 
                 # Show enhanced transcription if enabled and available
                 if (user_info.get('is_premium', False) and
                     user_info.get('show_transcription', False) and
                     metadata.get('enhanced_transcription')):
-                    response_text += f"\n🗣️ {escape_markdown(metadata['enhanced_transcription'])}"
+                    response_text += f"\n🗣️ {escape_html(metadata['enhanced_transcription'])}"
 
                 # Premium features - alternatives and explanations
                 if has_premium:
                     # Add synonyms/alternatives if available
                     if metadata.get('alternatives'):
-                        response_text += f"\n\n🔄 *Альтернативы:*\n"
+                        response_text += f"\n\n🔄 <b>Альтернативы:</b>\n"
                         for alt in metadata['alternatives'][:3]:  # Show max 3 alternatives
                             # Handle both old format (string) and new format (dict)
                             if isinstance(alt, dict):
-                                response_text += f"• {escape_markdown(alt['text'])}\n"
+                                response_text += f"• {escape_html(alt['text'])}\n"
                                 # Show transcription for alternative if enabled
                                 if (user_info.get('show_transcription', False) and
                                     alt.get('transcription')):
-                                    response_text += f"  🗣️ {escape_markdown(alt['transcription'])}\n"
+                                    response_text += f"  🗣️ {escape_html(alt['transcription'])}\n"
                             else:
-                                response_text += f"• {escape_markdown(alt)}\n"
+                                response_text += f"• {escape_html(alt)}\n"
 
                     # Add explanation if available
                     if metadata.get('explanation') and metadata['explanation'].strip():
                         explanation = metadata['explanation'].strip()[:200]  # Limit length
                         explanation_labels = {
-                            'ru': "💡 *Объяснение:*",
-                            'en': "💡 *Explanation:*"
+                            'ru': "💡 <b>Объяснение:</b>",
+                            'en': "💡 <b>Explanation:</b>"
                         }
                         label = explanation_labels.get(user_info.get('interface_language', 'ru'), explanation_labels['ru'])
-                        response_text += f"\n{label} {escape_markdown(explanation)}"
+                        response_text += f"\n{label} {escape_html(explanation)}"
                         if len(metadata['explanation']) > 200:
                             response_text += "..."
 
@@ -576,16 +576,16 @@ async def text_translation_handler(message: Message):
                             grammar += '.'
 
                         grammar_labels = {
-                            'ru': "📚 *Грамматика:*",
-                            'en': "📚 *Grammar:*"
+                            'ru': "📚 <b>Грамматика:</b>",
+                            'en': "📚 <b>Grammar:</b>"
                         }
                         label = grammar_labels.get(user_info.get('interface_language', 'ru'), grammar_labels['ru'])
-                        response_text += f"\n\n{label} {escape_markdown(grammar[:250])}"
+                        response_text += f"\n\n{label} {escape_html(grammar[:250])}"
                         if len(grammar) > 250:
                             response_text += "..."
             else:
                 logger.info("Showing single translation (no two stages)")
-                response_text += f"📝 *Перевод ({style_display}):*\n{escape_markdown(translated)}"
+                response_text += f"📝 <b>Перевод ({style_display}):</b>\n{escape_html(translated)}"
 
             # Add remaining translations info for free users (skip for admins)
             if not user_info.get('is_premium') and not is_admin:
@@ -605,7 +605,7 @@ async def text_translation_handler(message: Message):
             logger.info(f"Sending response to user {message.from_user.id}")
             await message.answer(
                 response_text,
-                parse_mode='Markdown',
+                parse_mode='HTML',
                 reply_markup=keyboard
             )
             logger.info("Response sent successfully")
