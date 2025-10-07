@@ -6,6 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LinguaBot is an AI-powered Telegram translator bot with freemium model. It features multi-tier translation (DeepL/Yandex → GPT-4o enhancement), voice processing, payment integration, and comprehensive user management.
 
+### 🟢 Production Status (Updated: 07.10.2025)
+
+**Live Bot:** @PolyglotAI44_bot
+**Domain:** https://voice2lang.ru (SSL: ✅ Active until 05.01.2026)
+**Server:** Selectel VPS (213.148.11.142) - SSH: `ssh FARUH`
+**Mode:** Webhook (HTTPS)
+**Database:** PostgreSQL 16 (local, migrated from Railway)
+**Status:** ✅ **OPERATIONAL**
+
+Quick health check:
+```bash
+ssh FARUH 'systemctl status linguabot'
+ssh FARUH 'tail -20 /opt/linguabot/logs/bot.log'
+curl -I https://voice2lang.ru/admin
+```
+
 ## Core Architecture
 
 ### Translation Pipeline
@@ -135,6 +151,9 @@ The Docker setup runs `main.py` with all features enabled.
 - `bot/middlewares/` - Request processing middleware
 - `bot/utils/` - Shared utilities and messages
 - `admin_app/` - Admin panel WebApp (aiohttp + Telegram WebApp integration)
+  - `static/modules/users_v2.js` - User management module (renamed to bypass Telegram WebApp cache)
+  - `app.py` - Route setup with no-cache headers for static files
+  - `handlers/users.py` - Includes `premium_until` field in user data
 - `data/` - PostgreSQL database backups and user data
 - `logs/` - Application logs
 - `exports/` - Generated PDF/TXT exports
@@ -176,18 +195,146 @@ All local development scripts are located in `.scripts/` directory (excluded fro
 
 ## Remote Server Access
 
-SSH credentials and deployment info are in `creds.md`:
+### Production Server (voice2lang.ru)
+- **SSH**: `ssh FARUH`
+- **Server IP**: 213.148.11.142
+- **Domain**: voice2lang.ru ✅ **CONFIGURED** (SSL active until 05.01.2026)
+- **Bot**: @PolyglotAI44_bot (token: 7833039830:AAFtpgWKphLaFxGnxExkWn6aG6Mm2EQC6wg)
+- **Project path**: `/opt/linguabot`
+- **User**: root
+- **OS**: Ubuntu 24.04 LTS
+- **Status**: 🟢 **PRODUCTION** (deployed 07.10.2025)
+
+### Old Beget Server (deprecated)
 - Server: `ssh vokhma1v@vokhma1v.beget.tech`
 - Project path: `/home/v/vokhma1v/vokhma1v.beget.tech/lingua_bot`
 
-### Server Management Scripts
+### Production Server Management (voice2lang.ru)
+
+**System Service:**
 ```bash
-# Server deployment and management (production)
+# Service control
+ssh FARUH 'systemctl start linguabot'   # Start bot
+ssh FARUH 'systemctl stop linguabot'    # Stop bot
+ssh FARUH 'systemctl restart linguabot' # Restart bot
+ssh FARUH 'systemctl status linguabot'  # Check status
+
+# Logs
+ssh FARUH 'tail -f /opt/linguabot/logs/bot.log'        # Main logs
+ssh FARUH 'tail -f /opt/linguabot/logs/bot_error.log'  # Error logs
+ssh FARUH 'journalctl -u linguabot -f'                 # System logs
+
+# Configuration
+ssh FARUH 'nano /opt/linguabot/.env'                   # Edit environment
+ssh FARUH 'systemctl daemon-reload'                    # Reload systemd after changes
+```
+
+**Deployment:**
+- Service file: `/etc/systemd/system/linguabot.service`
+- Auto-starts on boot
+- Automatic restart on failure (RestartSec=10)
+- Logs to `/opt/linguabot/logs/`
+
+**Environment:**
+- Python 3.12.3
+- PostgreSQL 16 (local), upgraded to PostgreSQL 17 client tools
+- Nginx 1.24.0 (reverse proxy with SSL)
+- No Docker (native installation)
+
+**Current Mode:**
+- ✅ **Webhook mode ACTIVE**: PORT=8080
+- ✅ **SSL/HTTPS enabled**: Let's Encrypt certificate
+- ✅ **Database**: Migrated from Railway (7 users, 65 translations)
+- ✅ **PROVIDER_TOKEN**: Configured for Telegram Payments (390540012:LIVE:78592)
+
+### DNS and SSL Setup ✅ COMPLETED
+
+**✅ DNS Configured:**
+```bash
+voice2lang.ru → 213.148.11.142 (A record)
+# Note: www.voice2lang.ru subdomain not configured (DNS NXDOMAIN)
+```
+
+**✅ SSL Certificate Installed:**
+```bash
+# Installed: certbot 2.9.0 + python3-certbot-nginx
+# Certificate: /etc/letsencrypt/live/voice2lang.ru/
+# Expiry: 2026-01-05 (auto-renewal enabled via systemd timer)
+# Command used:
+ssh FARUH 'certbot certonly --webroot -w /var/www/html -d voice2lang.ru --non-interactive --agree-tos -m admin@voice2lang.ru'
+```
+
+**✅ Webhook Mode Active:**
+```bash
+# .env configuration:
+PORT=8080
+WEBHOOK_HOST=https://voice2lang.ru
+BOT_TOKEN=7833039830:AAFtpgWKphLaFxGnxExkWn6aG6Mm2EQC6wg
+PROVIDER_TOKEN=390540012:LIVE:78592
+```
+
+**✅ Nginx Configuration:**
+- Config: `/etc/nginx/sites-available/linguabot`
+- HTTP (port 80) → HTTPS redirect
+- HTTPS (port 443) → proxy to localhost:8080
+- Handles both webhook and admin panel
+- SSL auto-renewal via certbot systemd timer
+- SSL protocols: TLSv1.2, TLSv1.3
+
+### Old Beget Server Scripts (deprecated)
+```bash
 ./install_beget.sh            # Install bot on Beget server
 ./start_beget.sh              # Start bot on Beget server
 ./stop_beget.sh               # Stop bot on server
+```
 
-# Local development scripts (in .scripts/)
+### Database Migration (Railway → Production Server)
+
+**✅ Completed: 07.10.2025**
+
+Migration from Railway PostgreSQL 17 to local PostgreSQL 16 on voice2lang.ru server:
+
+```bash
+# 1. Backup current database on FARUH
+ssh FARUH 'PGPASSWORD=linguabot_pass_2025 pg_dump -h localhost -U linguabot -d linguabot > /opt/linguabot/backups/linguabot_backup_$(date +%Y%m%d_%H%M%S).sql'
+
+# 2. Install PostgreSQL 17 client tools for compatibility
+ssh FARUH 'wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -'
+ssh FARUH 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+ssh FARUH 'apt update && apt install -y postgresql-client-17'
+
+# 3. Download Railway database dump
+ssh FARUH 'PGPASSWORD=NtLFItrylcyGPGHIqllCxepVRNTSkHYG /usr/lib/postgresql/17/bin/pg_dump -h hopper.proxy.rlwy.net -p 52905 -U postgres -d railway --no-owner --no-acl -f /opt/linguabot/backups/railway_dump.sql'
+
+# 4. Recreate database
+ssh FARUH 'sudo -u postgres psql -c "DROP DATABASE IF EXISTS linguabot;"'
+ssh FARUH 'sudo -u postgres psql -c "CREATE DATABASE linguabot OWNER linguabot;"'
+
+# 5. Restore Railway dump
+ssh FARUH 'PGPASSWORD=linguabot_pass_2025 psql -h localhost -U linguabot -d linguabot -f /opt/linguabot/backups/railway_dump.sql'
+
+# 6. Restart bot
+ssh FARUH 'systemctl restart linguabot'
+```
+
+**Migrated Data:**
+- Users: 7
+- Translation history: 65 records
+- Admin roles: 2
+- System settings: 21
+- Tables: admin_actions, admin_roles, feedback, schema_migrations, statistics, subscriptions, system_settings, translation_history, user_settings, users
+
+**Database Credentials:**
+- Host: localhost:5432
+- User: linguabot
+- Database: linguabot
+- Password: linguabot_pass_2025
+
+**Backup Location:** `/opt/linguabot/backups/`
+
+### Local Development Scripts
+```bash
+# Development scripts (in .scripts/)
 .scripts/run_dev.py           # Run bot in development mode
 .scripts/run_admin.py         # Run admin panel only
 .scripts/start_bot.sh         # Start bot locally
@@ -232,15 +379,25 @@ Voice handlers have strict data isolation:
 - **Toggle**: Premium users can enable/disable via Settings → 📝 Показывать транскрипцию
 
 ### Implementation Details
-- **Generation**: GPT-4o generates IPA for **basic translation only** (not enhanced/styled)
+- **Generation**: GPT-4o generates IPA for **ALL translation variants**: basic, enhanced, and all alternatives
 - **Location**: `bot/services/translator.py` - added to GPT prompt with explicit instructions
-- **Display**: Shows in chat as `🗣️ [IPA notation]` right after basic translation
+- **Storage Format**: Alternatives now stored as `{'text': '...', 'transcription': '...'}` dict (not plain strings)
+- **Display**: Shows in chat as `🗣️ [IPA notation]` for each translation variant when enabled
 - **Export**: Included in both PDF and TXT exports with label "Транскрипция:"
 
 ### Critical Prompt Instructions
 ```
-IMPORTANT: Create IPA transcription for the BASIC translation ONLY: "{translated_text}"
-NOT for the enhanced/styled version!
+IMPORTANT: Create IPA transcriptions for:
+- Basic translation: "{translated_text}"
+- Enhanced/styled translation
+- Each alternative translation
+
+Format:
+Enhanced: [text]
+EnhancedTranscription: [IPA]
+Alternative1: [text]
+Alternative1Transcription: [IPA]
+...
 ```
 
 ### Display Format
@@ -396,12 +553,17 @@ All handlers use `check_admin_with_permission()` for authorization and re-raise 
 1. **ADMIN_IDS format**: Must be numeric Telegram user ID, not username/URL
 2. **Docker not starting**: Ensure Docker Desktop is installed and WSL integration enabled
 3. **Translation failures**: Check API keys and account balances, services fail gracefully
-4. **Voice TTS errors**:
+4. **Production deployment - webhook domain not resolving**:
+   - **Symptom**: Bot fails to start with `Bad Request: bad webhook: Failed to resolve host: Name or service not known`
+   - **Cause**: DNS not configured or not propagated yet
+   - **Fix**: Switch to polling mode temporarily: `ssh FARUH 'cd /opt/linguabot && sed -i "s/^PORT=8080/PORT=0/" .env && systemctl restart linguabot'`
+   - **Permanent solution**: Configure DNS A-record pointing to server IP, install SSL certificate, then switch back to webhook mode
+5. **Voice TTS errors**:
    - Invalid voice_type (must be: alloy, echo, fable, onyx, nova, shimmer, ash, sage, coral)
    - Check OpenAI API key and ElevenLabs configuration
    - Ensure Telegram voice message permissions are enabled
-5. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation
-6. **Admin panel database connection errors in Docker**:
+6. **YooKassa payment errors**: Ensure `need_email=true` and `provider_data` are set for receipt generation
+7. **Admin panel database connection errors in Docker**:
    - **Symptom**: Admin panel shows "Loading..." forever, API endpoints return 500 errors with `socket.gaierror: [Errno -2] Name or service not known`
    - **Cause**: Postgres container in different Docker network (e.g., "bridge" instead of "linguabot_dev_network")
    - **Fix**: Fully recreate all containers:
@@ -416,7 +578,7 @@ All handlers use `check_admin_with_permission()` for authorization and re-raise 
      docker network inspect linguabot_dev_network --format '{{range $key, $value := .Containers}}{{$value.Name}}{{"\n"}}{{end}}'
      # Should show both: linguabot_postgres_dev and linguabot_dev
      ```
-7. **"No module named 'webhook'" error on Railway**:
+8. **"No module named 'webhook'" error on Railway**:
    - **Symptom**: Bot crashes with `ModuleNotFoundError: No module named 'webhook'`
    - **Cause**: `webhook.py` file was accidentally deleted during cleanup
    - **Fix**: Restore `webhook.py` from git history or backup - it's required for YooKassa payment processing
@@ -425,7 +587,7 @@ All handlers use `check_admin_with_permission()` for authorization and re-raise 
      - `main.py` - Bot entry point
      - `config.py` - Configuration management
      - Files in `bot/` directory - core bot functionality
-8. **PostgreSQL datetime handling - "'datetime.datetime' object is not subscriptable"**:
+9. **PostgreSQL datetime handling - "'datetime.datetime' object is not subscriptable"**:
    - **Symptom**: Errors in export (PDF/TXT), history display: `TypeError: 'datetime.datetime' object is not subscriptable`
    - **Cause**: PostgreSQL returns `created_at` as `datetime.datetime` object, not string. Code using string slicing like `item['created_at'][:19]` fails
    - **Solution**: Always check type before string operations:
@@ -442,6 +604,40 @@ All handlers use `check_admin_with_permission()` for authorization and re-raise 
      - `bot/handlers/export.py` - Export handlers (lines 58-70, 128-140)
      - `bot/handlers/callbacks.py` - History display (lines 311-321)
    - **Prevention**: Always use `isinstance(value, datetime)` when working with database date fields
+10. **Backslashes in translation text - escape_markdown issue**:
+   - **Symptom**: Translation messages show backslashes before punctuation: `Hello\!How are you\?`
+   - **Cause**: Using `escape_markdown()` with Markdown parse mode, which escapes characters like `.`, `!`, `?`, `-`, etc.
+   - **Solution**: Switch from Markdown to HTML formatting:
+     ```python
+     # OLD (incorrect)
+     def escape_markdown(text: str) -> str:
+         special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+         for char in special_chars:
+             text = text.replace(char, '\\' + char)
+         return text
+
+     await message.answer(text, parse_mode='Markdown')
+
+     # NEW (correct)
+     def escape_html(text: str) -> str:
+         text = text.replace('&', '&amp;')
+         text = text.replace('<', '&lt;')
+         text = text.replace('>', '&gt;')
+         return text
+
+     await message.answer(text, parse_mode='HTML')
+     ```
+   - **Formatting changes**:
+     - `*текст*` or `**текст**` → `<b>текст</b>` (bold)
+     - `` `код` `` → `<code>код</code>` (code)
+     - `_текст_` → `<i>текст</i>` (italic)
+   - **Affected files** (fixed 07.10.2025):
+     - `bot/handlers/base.py` - Main translation and voice handlers
+     - `bot/handlers/callbacks.py` - All callback handlers (alternatives, explanation, grammar, history)
+     - `bot/handlers/admin.py` - Admin panel messages
+     - `bot/handlers/payments.py` - Payment success message
+     - `bot/handlers/export.py` - Export format selection
+   - **Why HTML is better**: Only 3 characters need escaping (`&`, `<`, `>`), compared to 18+ in Markdown. Less prone to breaking user content.
 
 ## Database Migrations System
 
